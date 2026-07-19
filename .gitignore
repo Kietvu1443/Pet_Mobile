@@ -1,0 +1,50 @@
+# Node dependencies
+**/node_modules/
+
+# Expo / Metro / React Native local builds
+**/.expo/
+**/dist/
+**/web-build/
+**/*.tsbuildinfo
+**/.kotlin/
+**/*.orig.*
+**/*.jks
+**/*.p8
+**/*.p12
+**/*.key
+**/*.mobileprovision
+**/.metro-health-check*
+
+# Environment files
+.env
+.env.local
+**/.env
+**/.env.local
+**/.env*.local
+
+# System/OS files
+.DS_Store
+Thumbs.db
+**/Thumbs.db
+**/.DS_Store
+*.log
+**/logs/
+**/*.log
+
+# Backend uploads, backups & logs
+Pet_helper/uploads/
+Pet_helper/frontend/uploads/
+Pet_helper/pets/
+Pet_helper/backups/
+Pet_helper/logs/
+Pet_helper/Update/
+
+# Expo native outputs
+Pet_Mobile/ios/
+Pet_Mobile/android/
+Pet_Mobile/expo-env.d.ts
+
+# Agent configurations
+.claude/
+AGENTS.md
+CLAUDE.md

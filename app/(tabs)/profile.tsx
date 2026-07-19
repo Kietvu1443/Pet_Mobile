@@ -69,14 +69,17 @@ export default function ProfileScreen() {
   const [adoptionCount, setAdoptionCount] = useState(0);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [activeReview, setActiveReview] = useState<any>(null);
 
   // Shared callback used by both focus refresh and pull-to-refresh
   const refreshData = useCallback(async () => {
-    const [count] = await Promise.all([
+    const [count, activeReviewRes] = await Promise.all([
       fetchAdoptionCount(),
-      refreshUser(),
+      apiRequest<{ review: any | null }>('/housing-reviews/active').catch(() => ({ review: null })),
     ]);
+    await refreshUser();
     setAdoptionCount(count);
+    setActiveReview(activeReviewRes?.review ?? null);
   }, [refreshUser]);
 
   // Silent refresh every time the tab gains focus
@@ -155,9 +158,9 @@ export default function ProfileScreen() {
           iconBg: '#E8F8EE',
           iconColor: '#34C759',
           label: 'Đánh giá nhà ở',
-          sublabel: 'Cập nhật để tăng tỉ lệ duyệt',
-          // TODO: navigate to housing review screen when backend supports it
-          onPress: () => Alert.alert('Đang phát triển', 'Tính năng đánh giá nhà ở đang được phát triển'),
+          sublabel: activeReview?.status === 'rejected' ? 'Cần cập nhật thông tin' : 'Cập nhật để tăng tỉ lệ duyệt',
+          badge: activeReview?.status === 'pending' ? 'Chờ duyệt' : activeReview?.status === 'approved' ? 'Đã duyệt' : activeReview?.status === 'rejected' ? 'Cần sửa' : null,
+          onPress: () => router.push('/housing-review' as Parameters<typeof router.push>[0]),
         },
         {
           icon: 'alert-circle-outline',
@@ -258,6 +261,23 @@ export default function ProfileScreen() {
           </View>
         ))}
       </View>
+
+      {/* Rejected Housing Review callout */}
+      {activeReview?.status === 'rejected' && (
+        <View style={styles.alertCard}>
+          <View style={{ flexDirection: 'row', gap: 10, alignItems: 'center', marginBottom: 6 }}>
+            <Ionicons name="home-outline" size={20} color="#FF4D4F" />
+            <Text style={styles.alertTitle}>Đánh giá nhà ở cần cập nhật</Text>
+          </View>
+          <Text style={styles.alertText}>
+            Quản trị viên đã phản hồi về hồ sơ của bạn. Vui lòng cập nhật ngay để tiếp tục nhận nuôi.
+          </Text>
+          <Pressable style={styles.alertBtn} onPress={() => router.push('/housing-review')}>
+            <Text style={styles.alertBtnText}>Cập nhật ngay</Text>
+            <Ionicons name="arrow-forward" size={14} color="white" />
+          </Pressable>
+        </View>
+      )}
 
       {/* Menu Sections */}
       {menuSections.map((section) => (
@@ -529,6 +549,41 @@ const styles = StyleSheet.create({
     height: 1,
     backgroundColor: '#F5F5F5',
     marginLeft: 74,
+  },
+  // Alert card
+  alertCard: {
+    backgroundColor: '#FFF0F0',
+    borderRadius: 24,
+    padding: 18,
+    marginBottom: 16,
+    borderWidth: 1.5,
+    borderColor: '#FFC0C0',
+  },
+  alertTitle: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: '#1A1A1A',
+    flexShrink: 1,
+  },
+  alertText: {
+    fontSize: 13,
+    color: '#6B7280',
+    lineHeight: 20,
+    marginBottom: 14,
+  },
+  alertBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: '#FF4D4F',
+    borderRadius: 16,
+    paddingVertical: 12,
+  },
+  alertBtnText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: 'white',
   },
   // Logout
   logoutBtn: {

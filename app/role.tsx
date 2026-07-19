@@ -100,8 +100,7 @@ export default function RoleScreen() {
 
       <Pressable
         style={({ pressed }) => [styles.homeEvalBtn, pressed && { opacity: 0.7 }]}
-        // TODO: navigate to housing review screen when backend supports it
-        onPress={() => Alert.alert('Đang phát triển', 'Tính năng đánh giá nhà ở đang được phát triển')}
+        onPress={() => router.push('/housing-review' as Parameters<typeof router.push>[0])}
       >
         <Ionicons name="home-outline" size={18} color="#1A1A1A" />
         <Text style={styles.homeEvalText}>Đánh giá nhà ở</Text>

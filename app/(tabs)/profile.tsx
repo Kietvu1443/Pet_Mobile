@@ -29,20 +29,21 @@ import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '@/lib/auth/AuthContext';
 import { apiRequest } from '@/lib/api/client';
 import { calculateProfileCompletion } from '@/lib/profile/profileCompletion';
-import { getMockScanCount, getMockMatchCount } from '@/adapters/mockAdapter';
 import { resolveImageUrl } from '@/lib/images/resolveUrl';
+import { getCurrentRoleLabel, getQuickRoleFromPreferences } from '@/lib/profile/userRole';
 
 // Adoption request count from backend
-type AdoptionRequestsResponse = { requests: unknown[]; total?: number };
+type AdoptionRequestsResponse = { requests: { status?: string }[]; total?: number };
 
-async function fetchAdoptionCount(): Promise<number> {
+async function fetchAdoptionStats(): Promise<{ count: number; matchCount: number }> {
   try {
     const data = await apiRequest<AdoptionRequestsResponse>('/adoption-requests/my');
-    if (typeof data.total === 'number') return data.total;
-    if (Array.isArray(data.requests)) return data.requests.length;
-    return 0;
+    const requests = Array.isArray(data.requests) ? data.requests : [];
+    const count = typeof data.total === 'number' ? data.total : requests.length;
+    const matchCount = requests.filter(r => r.status === 'approved').length;
+    return { count, matchCount };
   } catch {
-    return 0;
+    return { count: 0, matchCount: 0 };
   }
 }
 
@@ -67,18 +68,23 @@ export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
 
   const [adoptionCount, setAdoptionCount] = useState(0);
+  const [matchCount, setMatchCount] = useState(0);
+  const [scanCount, setScanCount] = useState(0);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [activeReview, setActiveReview] = useState<any>(null);
 
   // Shared callback used by both focus refresh and pull-to-refresh
   const refreshData = useCallback(async () => {
-    const [count, activeReviewRes] = await Promise.all([
-      fetchAdoptionCount(),
+    const [stats, scanRes, activeReviewRes] = await Promise.all([
+      fetchAdoptionStats(),
+      apiRequest<{ total: number }>('/auth/scan-count').catch(() => ({ total: 0 })),
       apiRequest<{ review: any | null }>('/housing-reviews/active').catch(() => ({ review: null })),
     ]);
     await refreshUser();
-    setAdoptionCount(count);
+    setAdoptionCount(stats.count);
+    setMatchCount(stats.matchCount);
+    setScanCount(scanRes.total);
     setActiveReview(activeReviewRes?.review ?? null);
   }, [refreshUser]);
 
@@ -124,11 +130,8 @@ export default function ProfileScreen() {
   }, [isLoggingOut, logout]);
 
   const stats = [
-    // TODO: Replace with backend scan count endpoint
-    { count: getMockScanCount(), label: 'Đã quét', sublabel: 'tổng', color: '#1A1A1A' },
-    // TODO: Replace with backend match count endpoint
-    { count: getMockMatchCount(), label: 'Match', sublabel: 'chưa có', color: '#FF4FA3' },
-    // count from GET /api/v1/adoption-requests/my
+    { count: scanCount, label: 'Đã quét', sublabel: 'tổng', color: '#1A1A1A' },
+    { count: matchCount, label: 'Match', sublabel: matchCount === 0 ? 'chưa có' : 'lần', color: '#FF4FA3' },
     { count: adoptionCount, label: 'Nhận nuôi', sublabel: adoptionCount === 0 ? 'chưa có' : 'đơn', color: '#34C759' },
   ];
 
@@ -150,7 +153,7 @@ export default function ProfileScreen() {
           iconColor: '#FF4FA3',
           label: 'Vai trò',
           sublabel: 'Đổi vai trò bất cứ lúc ...',
-          badge: 'Nhận nuôi',
+          badge: getCurrentRoleLabel(user?.role, getQuickRoleFromPreferences(user?.preferences)),
           onPress: () => router.push('/role' as Parameters<typeof router.push>[0]),
         },
         {
@@ -176,8 +179,7 @@ export default function ProfileScreen() {
           iconColor: '#8B5CF6',
           label: 'Cài đặt',
           sublabel: 'Ngôn ngữ, thông báo, bảo mật',
-          // TODO: navigate to settings screen
-          onPress: () => Alert.alert('Đang phát triển', 'Tính năng cài đặt đang được phát triển'),
+          onPress: () => router.push('/settings' as Parameters<typeof router.push>[0]),
         },
         {
           icon: 'document-text-outline',
@@ -185,8 +187,7 @@ export default function ProfileScreen() {
           iconColor: '#34C759',
           label: 'Thông tin & Pháp lý',
           sublabel: 'Điều khoản & chính sách bảo mật',
-          // TODO: navigate to legal info screen
-          onPress: () => Alert.alert('Đang phát triển', 'Tính năng đang được phát triển'),
+          onPress: () => router.push('/legal-info' as Parameters<typeof router.push>[0]),
         },
       ],
     },

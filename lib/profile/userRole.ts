@@ -1,22 +1,28 @@
-// Centralised user role definitions and helpers.
-// These values match the frontend role-mapping convention.
-
 export enum UserRole {
-  ADMIN = 1,
+  ADMIN = 0,
+  STAFF = 1,
   USER = 2,
-  LOVER = 3,
 }
 
 export type QuickRole = "adopt" | "lover";
 
-/** Map a numeric role to a QuickRole. LOVER → "lover", everything else → "adopt". */
-export function getQuickRoleFromUserRole(
-  role: number | undefined | null,
+export function getQuickRoleFromPreferences(
+  preferences: { quickRole?: string } | null | undefined,
 ): QuickRole {
-  return role === UserRole.LOVER ? "lover" : "adopt";
+  if (preferences?.quickRole === "lover") return "lover";
+  return "adopt";
 }
 
-/** Return a human-readable label for the given role. */
-export function getRoleLabel(role: number | undefined | null): string {
-  return role === UserRole.ADMIN ? "Admin" : "Nhận nuôi";
+const QUICK_ROLE_LABEL: Record<QuickRole, string> = {
+  adopt: "Nhận nuôi",
+  lover: "Yêu thú cưng",
+};
+
+export function getCurrentRoleLabel(
+  userRole: number | undefined | null,
+  quickRole: QuickRole,
+): string {
+  if (userRole === UserRole.ADMIN) return "Admin";
+  if (userRole === UserRole.STAFF) return "Staff";
+  return QUICK_ROLE_LABEL[quickRole];
 }

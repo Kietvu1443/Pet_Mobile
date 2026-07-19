@@ -8,6 +8,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { setUnauthorizedHandler } from '../api/client';
 import { getMe, login as apiLogin, register as apiRegister, type RegisterData, type User } from '../api/auth';
+import { registerDevicePushToken, unregisterDevicePushToken } from '../notifications/device';
 import { clearToken, getToken, saveToken } from './tokenStore';
 
 type AuthContextValue = {
@@ -76,6 +77,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // /auth/login returns a subset; fetch full profile from /auth/me
         const me = await getMe();
         setUser(me);
+        registerDevicePushToken();
       },
       register: async (data: RegisterData) => {
         const result = await apiRegister(data);
@@ -83,8 +85,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // /auth/register returns a subset; fetch full profile from /auth/me
         const me = await getMe();
         setUser(me);
+        registerDevicePushToken();
       },
       logout: async () => {
+        await unregisterDevicePushToken();
         await clearToken();
         setUser(null);
       },

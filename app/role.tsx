@@ -1,11 +1,11 @@
 // RoleScreen — Màn hình chọn vai trò.
 //
 // Nguồn dữ liệu:
-//   - selectedRole   <- derived from user.role via getQuickRoleFromUserRole
+//   - selectedRole   <- derived from user.preferences via getQuickRoleFromPreferences
 //   - currentRole    <- user.role từ GET /auth/me
 import { useRouter } from 'expo-router';
+import { useEffect, useState } from 'react';
 import {
-  Alert,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -17,18 +17,60 @@ import { Ionicons } from '@expo/vector-icons';
 
 import { useAuth } from '@/lib/auth/AuthContext';
 import {
-  getQuickRoleFromUserRole,
-  getRoleLabel,
+  getCurrentRoleLabel,
+  getQuickRoleFromPreferences,
   type QuickRole,
 } from '@/lib/profile/userRole';
+import { apiRequest } from '@/lib/api/client';
+
+type ShelterStatus = 'unsubmitted' | 'pending' | 'approved' | 'rejected';
+
+const SHELTER_STATUS_LABEL: Record<string, { label: string; bg: string; color: string }> = {
+  pending: { label: 'Chờ duyệt', bg: '#FFF8E8', color: '#B8860B' },
+  approved: { label: 'Đã duyệt', bg: '#E8F8EE', color: '#34C759' },
+  rejected: { label: 'Bị từ chối', bg: '#FFF0F0', color: '#FF4D4F' },
+};
 
 export default function RoleScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { user } = useAuth();
+  const { user, refreshUser } = useAuth();
 
-  const selectedRole = getQuickRoleFromUserRole(user?.role);
-  const roleLabel = getRoleLabel(user?.role);
+  const [quickRole, setQuickRole] = useState<QuickRole>(getQuickRoleFromPreferences(user?.preferences));
+  const roleLabel = getCurrentRoleLabel(user?.role, quickRole);
+  const [shelterStatus, setShelterStatus] = useState<ShelterStatus>('unsubmitted');
+  const [shelterAdminNotes, setShelterAdminNotes] = useState<string | null>(null);
+
+  useEffect(() => {
+    setQuickRole(getQuickRoleFromPreferences(user?.preferences));
+  }, [user?.preferences?.quickRole]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const data = await apiRequest<{ shelter: { status: string; admin_notes: string | null } | null }>('/shelters');
+        if (data.shelter) {
+          setShelterStatus(data.shelter.status as ShelterStatus);
+          setShelterAdminNotes(data.shelter.admin_notes);
+        }
+      } catch {
+        // No shelter
+      }
+    })();
+  }, []);
+
+  const handleQuickRole = async (id: QuickRole) => {
+    setQuickRole(id);
+    try {
+      await apiRequest('/auth/preferences', {
+        method: 'PATCH',
+        body: { preferences: { quickRole: id } },
+      });
+      await refreshUser();
+    } catch {
+      // Swallow errors — preferences are non-critical
+    }
+  };
 
   const quickRoles: {
     id: QuickRole;
@@ -82,7 +124,7 @@ export default function RoleScreen() {
       {/* Current Role Card */}
       <View style={styles.currentRoleCard}>
         <View style={styles.currentRoleIcon}>
-          <Ionicons name="paw" size={24} color="#FF4FA3" />
+          <Ionicons name={quickRole === 'lover' ? 'heart' : 'paw'} size={24} color="#FF4FA3" />
         </View>
         <View>
           <Text style={styles.currentRoleTag}>Vai trò hiện tại</Text>
@@ -114,7 +156,7 @@ export default function RoleScreen() {
 
       <View style={styles.rolesCard}>
         {quickRoles.map((role, i) => {
-          const isSelected = selectedRole === role.id;
+          const isSelected = quickRole === role.id;
           return (
             <View key={role.id}>
               <Pressable
@@ -124,7 +166,7 @@ export default function RoleScreen() {
                   pressed && { opacity: 0.85 },
                 ]}
                 // TODO: Persist role change via backend endpoint when available
-                onPress={() => Alert.alert('Đang phát triển', 'Tính năng đổi vai trò đang chờ phát triển từ backend')}
+                onPress={() => handleQuickRole(role.id)}
               >
                 <View style={[styles.roleIcon, { backgroundColor: role.iconBg }]}>
                   <Ionicons name={role.icon} size={22} color={role.iconColor} />
@@ -159,13 +201,24 @@ export default function RoleScreen() {
           <View style={{ flex: 1 }}>
             <View style={styles.shelterTitleRow}>
               <Text style={styles.roleTitle}>Trại cứu hộ</Text>
-              <View style={styles.notRegisteredBadge}>
-                <Text style={styles.notRegisteredText}>Chưa đăng ký</Text>
-              </View>
+              {shelterStatus === 'unsubmitted' ? (
+                <View style={styles.notRegisteredBadge}>
+                  <Text style={styles.notRegisteredText}>Chưa đăng ký</Text>
+                </View>
+              ) : (
+                <View style={[styles.statusBadgeSmall, { backgroundColor: SHELTER_STATUS_LABEL[shelterStatus]?.bg || '#F0F0F0' }]}>
+                  <Text style={[styles.statusBadgeSmallText, { color: SHELTER_STATUS_LABEL[shelterStatus]?.color || '#888' }]}>
+                    {SHELTER_STATUS_LABEL[shelterStatus]?.label || shelterStatus}
+                  </Text>
+                </View>
+              )}
             </View>
             <Text style={styles.roleDesc}>
               Quản lý nhiều thú cưng, nhận yêu cầu nhận nuôi và xuất hiện trên bản đồ trại.
             </Text>
+            {shelterAdminNotes && (
+              <Text style={styles.shelterAdminNotes}>Phản hồi: {shelterAdminNotes}</Text>
+            )}
           </View>
         </View>
         <View style={styles.shelterDivider} />
@@ -177,10 +230,11 @@ export default function RoleScreen() {
         ))}
         <Pressable
           style={({ pressed }) => [styles.registerBtn, pressed && { opacity: 0.85 }]}
-          // TODO: navigate to rescue camp registration flow when backend supports it
-          onPress={() => Alert.alert('Đang phát triển', 'Tính năng đăng ký trại cứu hộ đang được phát triển')}
+          onPress={() => router.push('/shelter-registration' as Parameters<typeof router.push>[0])}
         >
-          <Text style={styles.registerBtnText}>Đăng ký trại cứu hộ</Text>
+          <Text style={styles.registerBtnText}>
+            {shelterStatus === 'unsubmitted' ? 'Đăng ký trại cứu hộ' : shelterStatus === 'rejected' ? 'Cập nhật lại' : 'Xem chi tiết'}
+          </Text>
         </Pressable>
       </View>
     </ScrollView>
@@ -297,4 +351,11 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.35, shadowRadius: 12, elevation: 6,
   },
   registerBtnText: { color: 'white', fontSize: 15, fontWeight: '700' },
+  statusBadgeSmall: {
+    borderRadius: 6, paddingHorizontal: 8, paddingVertical: 2,
+  },
+  statusBadgeSmallText: { fontSize: 11, fontWeight: '700' },
+  shelterAdminNotes: {
+    fontSize: 12, color: '#888', marginTop: 6, fontStyle: 'italic',
+  },
 });

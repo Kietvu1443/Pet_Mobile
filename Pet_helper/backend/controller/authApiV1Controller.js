@@ -267,6 +267,8 @@ const authApiV1Controller = {
 
   async me(req, res) {
     try {
+      res.set("Cache-Control", "no-cache, no-store, must-revalidate");
+
       if (!req.user || !req.user.id) {
         return sendError(res, 401, "Vui lòng đăng nhập tài khoản");
       }

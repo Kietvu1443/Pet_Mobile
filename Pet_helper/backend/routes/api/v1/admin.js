@@ -52,6 +52,14 @@ router.patch(
 
 // ============ HOUSING REVIEW MANAGEMENT ============
 
+// GET /api/v1/admin/housing-reviews - Admin & Staff can view
+router.get(
+  "/housing-reviews",
+  requireApiAuth,
+  requireApiRole([0, 1]),
+  adminApiV1Controller.getHousingReviews,
+);
+
 // PATCH /api/v1/admin/housing-reviews/:id/status - Admin only
 router.patch(
   "/housing-reviews/:id/status",

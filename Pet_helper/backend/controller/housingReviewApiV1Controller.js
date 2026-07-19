@@ -15,7 +15,7 @@ const housingReviewApiV1Controller = {
 
   async create(req, res) {
     try {
-      const { house_type, own_or_rent, has_allergies, has_pets } = req.body;
+      const { house_type, own_or_rent, has_allergies, has_pets, outdoor_space, has_children, time_at_home, experience, income, when_away } = req.body;
       if (!house_type || !own_or_rent) {
         return sendError(res, 400, "Vui lòng điền đầy đủ thông tin (house_type, own_or_rent)");
       }
@@ -25,7 +25,7 @@ const housingReviewApiV1Controller = {
       if (!validTenures.includes(own_or_rent)) return sendError(res, 400, "Hình thức sở hữu không hợp lệ");
 
       await HousingReview.deactivate(req.user.id);
-      const review = await HousingReview.create(req.user.id, { house_type, own_or_rent, has_allergies, has_pets });
+      const review = await HousingReview.create(req.user.id, { house_type, own_or_rent, has_allergies, has_pets, outdoor_space, has_children, time_at_home, experience, income, when_away });
       return sendSuccess(res, 201, "Tạo đánh giá nhà ở thành công", { review });
     } catch (error) {
       console.error("[HousingReview] create error:", error);
@@ -42,6 +42,16 @@ const housingReviewApiV1Controller = {
       return sendSuccess(res, 200, "Cập nhật đánh giá nhà ở thành công", { review: updated });
     } catch (error) {
       console.error("[HousingReview] update error:", error);
+      return sendError(res, 500, "Đã xảy ra lỗi, vui lòng thử lại");
+    }
+  },
+
+  async getActive(req, res) {
+    try {
+      const review = await HousingReview.findActiveByUserId(req.user.id);
+      return sendSuccess(res, 200, "Lấy đánh giá nhà ở thành công", { review: review || null });
+    } catch (error) {
+      console.error("[HousingReview] getActive error:", error);
       return sendError(res, 500, "Đã xảy ra lỗi, vui lòng thử lại");
     }
   },

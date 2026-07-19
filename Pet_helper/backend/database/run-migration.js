@@ -109,7 +109,15 @@ const STATEMENTS = [
     INDEX idx_hr_status (status)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
 
-  // 10. Bảng housing_review_photos
+  // 10. Mở rộng housing_reviews: Premium UI fields
+  `ALTER TABLE housing_reviews ADD COLUMN outdoor_space VARCHAR(20) NULL AFTER has_pets`,
+  `ALTER TABLE housing_reviews ADD COLUMN has_children TINYINT(1) DEFAULT 0 AFTER has_pets`,
+  `ALTER TABLE housing_reviews ADD COLUMN time_at_home VARCHAR(20) NULL AFTER has_children`,
+  `ALTER TABLE housing_reviews ADD COLUMN experience VARCHAR(20) NULL AFTER time_at_home`,
+  `ALTER TABLE housing_reviews ADD COLUMN income VARCHAR(20) NULL AFTER experience`,
+  `ALTER TABLE housing_reviews ADD COLUMN when_away JSON NULL AFTER income`,
+
+  // 11. Bảng housing_review_photos
   `CREATE TABLE IF NOT EXISTS housing_review_photos (
     id INT AUTO_INCREMENT PRIMARY KEY,
     review_id INT NOT NULL,
@@ -118,7 +126,7 @@ const STATEMENTS = [
     CONSTRAINT fk_hrp_review FOREIGN KEY (review_id) REFERENCES housing_reviews(id) ON DELETE CASCADE
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
 
-  // 11. Bảng shelters
+  // 12. Bảng shelters
   `CREATE TABLE IF NOT EXISTS shelters (
     id INT AUTO_INCREMENT PRIMARY KEY,
     user_id INT NOT NULL,
@@ -138,7 +146,7 @@ const STATEMENTS = [
     INDEX idx_shelter_status (status)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
 
-  // 12. Bảng shelter_photos
+  // 13. Bảng shelter_photos
   `CREATE TABLE IF NOT EXISTS shelter_photos (
     id INT AUTO_INCREMENT PRIMARY KEY,
     shelter_id INT NOT NULL,
@@ -147,7 +155,7 @@ const STATEMENTS = [
     CONSTRAINT fk_sp_shelter FOREIGN KEY (shelter_id) REFERENCES shelters(id) ON DELETE CASCADE
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
 
-  // 13. Bảng shelter_documents
+  // 14. Bảng shelter_documents
   `CREATE TABLE IF NOT EXISTS shelter_documents (
     id INT AUTO_INCREMENT PRIMARY KEY,
     shelter_id INT NOT NULL,
@@ -156,7 +164,7 @@ const STATEMENTS = [
     CONSTRAINT fk_sd_shelter FOREIGN KEY (shelter_id) REFERENCES shelters(id) ON DELETE CASCADE
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
 
-  // 14. Bảng user_devices (push tokens)
+  // 15. Bảng user_devices (push tokens)
   `CREATE TABLE IF NOT EXISTS user_devices (
     id INT AUTO_INCREMENT PRIMARY KEY,
     user_id INT NOT NULL,
@@ -168,7 +176,7 @@ const STATEMENTS = [
     INDEX idx_user_devices (user_id)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
 
-  // 15. Bảng pet_scans (analytics)
+  // 16. Bảng pet_scans (analytics)
   `CREATE TABLE IF NOT EXISTS pet_scans (
     id INT AUTO_INCREMENT PRIMARY KEY,
     user_id INT NULL,

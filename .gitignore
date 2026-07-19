@@ -1,3 +1,11 @@
+# Core project directories to keep (only Pet_helper and Pet_Mobile)
+# Ignore all other root directories
+/.agents/
+/.kilo/
+/Premium Mobile UI Design/
+/graphify-out/
+/plan/
+
 # Node dependencies
 **/node_modules/
 

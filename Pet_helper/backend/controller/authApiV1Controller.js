@@ -490,6 +490,25 @@ const authApiV1Controller = {
     }
   },
 
+  async getScanCount(req, res) {
+    try {
+      if (!req.user || !req.user.id) {
+        return sendError(res, 401, "Vui lòng đăng nhập tài khoản");
+      }
+      const { pool } = require("../config/db");
+      const [rows] = await pool.execute(
+        "SELECT COUNT(*) AS total FROM pet_scans WHERE user_id = ?",
+        [req.user.id],
+      );
+      return sendSuccess(res, 200, "Lấy số lượt quét thành công", {
+        total: rows[0].total,
+      });
+    } catch (error) {
+      console.error("[Auth API v1] getScanCount error:", error);
+      return sendError(res, 500, "Đã xảy ra lỗi, vui lòng thử lại");
+    }
+  },
+
   async updatePreferences(req, res) {
     try {
       if (!req.user || !req.user.id) {

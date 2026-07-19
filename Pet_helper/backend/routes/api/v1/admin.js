@@ -70,6 +70,14 @@ router.patch(
 
 // ============ SHELTER MANAGEMENT ============
 
+// GET /api/v1/admin/shelters - Admin & Staff can view
+router.get(
+  "/shelters",
+  requireApiAuth,
+  requireApiRole([0, 1]),
+  adminApiV1Controller.getShelters,
+);
+
 // PATCH /api/v1/admin/shelters/:id/status - Admin only
 router.patch(
   "/shelters/:id/status",

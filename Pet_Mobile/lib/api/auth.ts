@@ -22,6 +22,7 @@ export type User = {
   birthday?: string | null;
   gender?: string | null;
   phone?: string | null;
+  preferences?: { quickRole?: string } | null;
 };
 
 type LoginResponse = {

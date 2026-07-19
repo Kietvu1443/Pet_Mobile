@@ -344,6 +344,29 @@ const adminApiV1Controller = {
   // ============ SHELTER ADMIN ============
 
   /**
+   * GET /api/v1/admin/shelters
+   * Admin & Staff can view shelters with pagination and status filter.
+   */
+  async getShelters(req, res) {
+    try {
+      const page = Math.max(1, toNumber(req.query.page, 1));
+      const pageSize = Math.min(100, Math.max(1, toNumber(req.query.pageSize || req.query.limit, 10)));
+      const status = ["pending", "approved", "rejected"].includes(req.query.status) ? req.query.status : undefined;
+      const result = await Shelter.findAll({ page, limit: pageSize, status });
+      return sendSuccess(res, 200, "Lấy danh sách trại cứu hộ thành công", {
+        data: result.data,
+        page,
+        pageSize,
+        total: result.total,
+        totalPages: result.totalPages,
+      });
+    } catch (error) {
+      console.error("[Admin API v1] getShelters error:", error);
+      return sendError(res, 500, "Không thể tải danh sách trại cứu hộ");
+    }
+  },
+
+  /**
    * PATCH /api/v1/admin/shelters/:id/status
    * Admin only. Approve or reject a shelter.
    */

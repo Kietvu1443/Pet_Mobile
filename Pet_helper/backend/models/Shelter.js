@@ -44,7 +44,12 @@ const Shelter = {
 
   async update(id, userId, data) {
     try {
-      const fields = [];
+      const fields = [
+        "status = 'pending'",
+        "admin_notes = NULL",
+        "reviewed_by = NULL",
+        "reviewed_at = NULL"
+      ];
       const params = [];
       if (data.name !== undefined) { fields.push("name = ?"); params.push(data.name); }
       if (data.description !== undefined) { fields.push("description = ?"); params.push(data.description); }
@@ -53,7 +58,7 @@ const Shelter = {
       if (fields.length === 0) return null;
       params.push(id, userId);
       const [result] = await pool.execute(
-        `UPDATE shelters SET ${fields.join(", ")} WHERE id = ? AND user_id = ?`,
+        `UPDATE shelters SET ${fields.join(", ")} WHERE id = ? AND user_id = ? AND (status = 'pending' OR status = 'rejected')`,
         params,
       );
       return result.affectedRows > 0 ? this.findById(id) : null;
@@ -76,14 +81,26 @@ const Shelter = {
     }
   },
 
-  async findAllPending() {
+  async findAll({ page = 1, limit = 10, status } = {}) {
     try {
-      const [rows] = await pool.execute(
-        "SELECT s.*, u.display_name, u.name, u.email FROM shelters s JOIN users u ON s.user_id = u.id WHERE s.status = 'pending' ORDER BY s.created_at ASC",
+      const offset = (page - 1) * limit;
+      const conditions = ["1=1"];
+      const countParams = [];
+      if (status) { conditions.push("s.status = ?"); countParams.push(status); }
+      const where = conditions.join(" AND ");
+      const [countRows] = await pool.execute(
+        `SELECT COUNT(*) as total FROM shelters s WHERE ${where}`,
+        countParams,
       );
-      return rows;
+      const total = countRows[0].total;
+      const dataParams = [...countParams, Number(limit), Number(offset)];
+      const [rows] = await pool.query(
+        `SELECT s.*, u.display_name, u.name, u.email FROM shelters s JOIN users u ON s.user_id = u.id WHERE ${where} ORDER BY s.created_at DESC LIMIT ? OFFSET ?`,
+        dataParams,
+      );
+      return { data: rows, total, page, totalPages: Math.ceil(total / limit) };
     } catch (error) {
-      console.error("Error finding pending shelters:", error);
+      console.error("Error finding shelters:", error);
       throw error;
     }
   },

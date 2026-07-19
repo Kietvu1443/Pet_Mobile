@@ -11,6 +11,7 @@ router.post("/register", authApiV1Controller.register);
 router.post("/login", authApiV1Controller.login);
 router.post("/logout", authApiV1Controller.logout);
 router.get("/me", requireApiAuth, authApiV1Controller.me);
+router.get("/scan-count", requireApiAuth, authApiV1Controller.getScanCount);
 router.patch("/profile", requireApiAuth, authApiV1Controller.updateProfile);
 router.patch("/preferences", requireApiAuth, authApiV1Controller.updatePreferences);
 router.post("/avatar", requireApiAuth, authApiV1Controller.uploadAvatar);

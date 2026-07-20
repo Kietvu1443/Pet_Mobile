@@ -4,38 +4,76 @@
  * Thiết kế mở rộng: có thể thêm email/push sau này.
  */
 const { pool } = require("../config/db");
+const User = require("../models/User");
+const UserDevice = require("../models/UserDevice");
+const { sendPushNotifications } = require("../utils/expoPush");
+const NOTIF_TYPES = require("../shared/constants/notificationTypes");
 
 const notificationService = {
   /**
    * Gửi thông báo cho một user.
-   * @param {number} userId
-   * @param {string} title
-   * @param {string} message
-   * @param {string} type - 'system' | 'return_workflow'
+   * Legacy signature: send(userId, title, message, type)
+   * Modern signature:  send({ userId, title, message, type, data })
+   * @param {number|Object} userIdOrObj
+   * @param {string} [title]
+   * @param {string} [message]
+   * @param {string} [type]
    */
-  async send(userId, title, message, type = "return_workflow") {
+  async send(userIdOrObj, title, message, type = "return_workflow") {
     try {
+      let userId, data;
+      if (typeof userIdOrObj === "object") {
+        userId = userIdOrObj.userId;
+        title = userIdOrObj.title;
+        message = userIdOrObj.message;
+        type = userIdOrObj.type || "system";
+        data = userIdOrObj.data;
+      } else {
+        userId = userIdOrObj;
+      }
+
       await pool.execute(
         `INSERT INTO notifications (user_id, title, message, type) VALUES (?, ?, ?, ?)`,
         [userId, title, message, type],
       );
+
+      // Check user push preference — skip push dispatch if disabled
+      const pushPref = await User.findById(userId)
+        .then(u => u?.preferences?.pushEnabled)
+        .catch(() => null);
+      if (pushPref === false) return;
+
+      // Push dispatch in background — never block the request lifecycle
+      const devices = await UserDevice.findByUserId(userId).catch(() => []);
+      if (devices && devices.length > 0) {
+        const tokens = devices.map((d) => d.push_token).filter(Boolean);
+        if (tokens.length > 0) {
+          void sendPushNotifications(tokens, title, message, {
+            type,
+            ...data,
+          }).catch(console.error);
+        }
+      }
     } catch (err) {
       // Không throw để không làm gián đoạn luồng chính
-      console.error("[notificationService] Ghi thông báo thất bại:", err.message);
+      console.error(
+        "[notificationService] Ghi thông báo thất bại:",
+        err.message,
+      );
     }
   },
 
   /**
-   * Lấy danh sách thông báo của user (20 mới nhất).
+   * Lấy danh sách thông báo của user với phân trang.
    */
-  async getForUser(userId, limit = 20) {
+  async getForUser(userId, limit = 20, offset = 0) {
     const [rows] = await pool.execute(
       `SELECT id, title, message, type, is_read, created_at
        FROM notifications
        WHERE user_id = ?
        ORDER BY created_at DESC
-       LIMIT ?`,
-      [userId, String(limit)],
+       LIMIT ? OFFSET ?`,
+      [userId, String(limit), String(offset)],
     );
     return rows;
   },
@@ -65,11 +103,12 @@ const notificationService = {
 
   async notifyStaffNewReturn(staffUserIds, petName, returnId) {
     for (const sid of staffUserIds) {
-      await this.send(
-        sid,
-        "📬 Yêu cầu trả thú cưng mới",
-        `Có yêu cầu trả lại "${petName}" (Mã hồ sơ: #${returnId}). Vui lòng xem xét và xử lý.`,
-      );
+      await this.send({
+        userId: sid,
+        title: "📬 Yêu cầu trả thú cưng mới",
+        message: `Có yêu cầu trả lại "${petName}" (Mã hồ sơ: #${returnId}). Vui lòng xem xét và xử lý.`,
+        type: NOTIF_TYPES.PET_RETURN_CREATED,
+      });
     }
   },
 
@@ -95,7 +134,12 @@ const notificationService = {
 
     const tpl = statusMessages[newStatus];
     if (tpl) {
-      await this.send(userId, tpl.title, tpl.message);
+      await this.send({
+        userId,
+        title: tpl.title,
+        message: tpl.message,
+        type: NOTIF_TYPES.PET_RETURN_UPDATED,
+      });
     }
   },
 };

@@ -378,6 +378,9 @@ const authApiV1Controller = {
       const phone = req.body?.phone !== undefined
         ? String(req.body.phone || "").trim()
         : (currentUser.phone || "");
+      const address = req.body?.address !== undefined
+        ? String(req.body.address || "").trim()
+        : (currentUser.address || "");
 
       // Validate birthday: must be a valid date and not in the future
       if (birthday) {
@@ -430,6 +433,7 @@ const authApiV1Controller = {
         birthday: birthday || null,
         gender: gender || null,
         phone: phone || null,
+        address: address || null,
       });
 
       if (!updatedUser) {
@@ -466,6 +470,7 @@ const authApiV1Controller = {
           birthday: updatedUser.birthday || null,
           gender: updatedUser.gender || null,
           phone: updatedUser.phone || null,
+          address: updatedUser.address || null,
         },
       });
     } catch (error) {
@@ -519,11 +524,13 @@ const authApiV1Controller = {
         return sendError(res, 400, "Preferences phải là một object hợp lệ");
       }
       const allowedKeys = ["quickRole", "theme", "language", "pushEnabled", "emailEnabled"];
-      const sanitized = {};
+      const currentUser = await User.findById(req.user.id);
+      const existing = currentUser?.preferences || {};
+      const merged = { ...existing };
       for (const key of allowedKeys) {
-        if (preferences[key] !== undefined) sanitized[key] = preferences[key];
+        if (preferences[key] !== undefined) merged[key] = preferences[key];
       }
-      await User.updatePreferences(req.user.id, sanitized);
+      await User.updatePreferences(req.user.id, merged);
       const user = await User.findById(req.user.id);
       return sendSuccess(res, 200, "Cập nhật preferences thành công", {
         preferences: user.preferences || null,

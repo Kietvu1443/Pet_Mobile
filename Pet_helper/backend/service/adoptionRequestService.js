@@ -1,4 +1,6 @@
 const { pool } = require("../config/db");
+const notificationService = require("./notificationService");
+const NOTIF_TYPES = require("../shared/constants/notificationTypes");
 
 function createError(status, message) {
   const error = new Error(message);
@@ -114,6 +116,14 @@ const adoptionRequestService = {
       return this.approveAdoptionRequest({ requestId, reviewerId });
     }
 
+    const [reqRows] = await pool.execute(
+      "SELECT ar.id, ar.user_id, ar.status, p.name AS pet_name FROM adoption_requests ar LEFT JOIN pets p ON ar.pet_id = p.id WHERE ar.id = ?",
+      [requestId],
+    );
+    if (!reqRows.length) {
+      throw createError(404, "Không tìm thấy hồ sơ nhận nuôi");
+    }
+
     const [result] = await pool.execute(
       `UPDATE adoption_requests
        SET status = 'rejected', reviewed_by = ?, reviewed_at = NOW()
@@ -122,18 +132,16 @@ const adoptionRequestService = {
     );
 
     if (!result.affectedRows) {
-      const [existingRows] = await pool.execute(
-        "SELECT id FROM adoption_requests WHERE id = ? LIMIT 1",
-        [requestId],
-      );
-      if (!existingRows.length) {
-        throw createError(404, "Không tìm thấy hồ sơ nhận nuôi");
-      }
-      throw createError(
-        409,
-        "Hồ sơ đã được xử lý trước đó, vui lòng tải lại dữ liệu",
-      );
+      throw createError(409, "Hồ sơ đã được xử lý trước đó, vui lòng tải lại dữ liệu");
     }
+
+    notificationService.send({
+      userId: reqRows[0].user_id,
+      title: "❌ Yêu cầu nhận nuôi bị từ chối",
+      message: `Yêu cầu nhận nuôi "${reqRows[0].pet_name || 'thú cưng'}" của bạn đã bị từ chối.`,
+      type: NOTIF_TYPES.ADOPTION_REJECTED,
+      data: { requestId, status: "rejected" },
+    });
 
     return { id: requestId, status: "rejected" };
   },
@@ -144,9 +152,10 @@ const adoptionRequestService = {
       await connection.beginTransaction();
 
       const [requestRows] = await connection.execute(
-        `SELECT id, pet_id, status
-         FROM adoption_requests
-         WHERE id = ?
+        `SELECT ar.id, ar.user_id, ar.pet_id, ar.status, p.name AS pet_name
+         FROM adoption_requests ar
+         JOIN pets p ON ar.pet_id = p.id
+         WHERE ar.id = ?
          FOR UPDATE`,
         [requestId],
       );
@@ -202,6 +211,15 @@ const adoptionRequestService = {
       );
 
       await connection.commit();
+
+      notificationService.send({
+        userId: request.user_id,
+        title: "✅ Yêu cầu nhận nuôi đã được duyệt",
+        message: `Yêu cầu nhận nuôi "${request.pet_name || 'thú cưng'}" của bạn đã được duyệt! Vui lòng liên hệ trại cứu hộ để sắp xếp đón bé.`,
+        type: NOTIF_TYPES.ADOPTION_APPROVED,
+        data: { requestId, petId: request.pet_id, status: "approved" },
+      });
+
       return { id: requestId, status: "approved" };
     } catch (error) {
       await connection.rollback();

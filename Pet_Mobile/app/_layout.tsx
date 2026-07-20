@@ -6,8 +6,9 @@ import {
   useFonts,
 } from '@expo-google-fonts/fredoka';
 import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
-import { Stack, useRouter, useSegments } from 'expo-router';
+import { Stack, usePathname, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import * as Notifications from 'expo-notifications';
 import { useEffect } from 'react';
 import { ActivityIndicator, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -16,10 +17,22 @@ import 'react-native-reanimated';
 
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { AuthProvider, useAuth } from '@/lib/auth/AuthContext';
+import { navigateFromNotification } from '@/lib/notifications/device';
+import { fetchGlobalUnread } from '@/lib/notifications/unread';
 
 export const unstable_settings = {
   anchor: '(tabs)',
 };
+
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowAlert: true,
+    shouldShowBanner: true,
+    shouldShowList: true,
+    shouldPlaySound: true,
+    shouldSetBadge: false,
+  }),
+});
 
 export default function RootLayout() {
   return (
@@ -38,6 +51,7 @@ function RootNavigator() {
   const { isAuthenticated, isBootstrapping } = useAuth();
   const segments = useSegments();
   const router = useRouter();
+  const pathname = usePathname();
 
   // Nạp font Fredoka (bản sắc PetSnap legacy) — chờ cùng với bootstrap auth.
   const [fontsLoaded] = useFonts({
@@ -48,6 +62,27 @@ function RootNavigator() {
   });
 
   const ready = !isBootstrapping && fontsLoaded;
+
+  // Notification listeners — only after bootstrap
+  useEffect(() => {
+    if (!ready || !isAuthenticated) return;
+
+    const receivedSub = Notifications.addNotificationReceivedListener(() => {
+      void fetchGlobalUnread();
+    });
+
+    const tapSub = Notifications.addNotificationResponseReceivedListener((response) => {
+      const type = response.notification.request.content.data?.type as string | undefined;
+      if (type) {
+        navigateFromNotification(type, router, pathname);
+      }
+    });
+
+    return () => {
+      receivedSub.remove();
+      tapSub.remove();
+    };
+  }, [ready, isAuthenticated, router, pathname]);
 
   // Route gate: chuyển hướng theo trạng thái đăng nhập sau khi bootstrap xong.
   useEffect(() => {
@@ -76,6 +111,7 @@ function RootNavigator() {
       <Stack>
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="(auth)" options={{ headerShown: false }} />
+        <Stack.Screen name="notifications" options={{ headerShown: false }} />
       </Stack>
       <StatusBar style="auto" />
     </ThemeProvider>

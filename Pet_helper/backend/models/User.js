@@ -118,11 +118,11 @@ const User = {
   // Update profile fields for current user
   async updateProfile(userId, profileData) {
     try {
-      const { display_name, name, email, verify, birthday, gender, phone } = profileData;
+      const { display_name, name, email, verify, birthday, gender, phone, address } = profileData;
 
       const [result] = await pool.execute(
-        "UPDATE users SET display_name = ?, name = ?, email = ?, verify = ?, birthday = ?, gender = ?, phone = ? WHERE id = ?",
-        [display_name, name, email, verify, birthday || null, gender || null, phone || null, userId],
+        "UPDATE users SET display_name = ?, name = ?, email = ?, verify = ?, birthday = ?, gender = ?, phone = ?, address = ? WHERE id = ?",
+        [display_name, name, email, verify, birthday || null, gender || null, phone || null, address || null, userId],
       );
 
       if (result.affectedRows === 0) {

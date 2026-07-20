@@ -13,7 +13,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 
 import { apiRequest } from '@/lib/api/client';
-import { getLanguage, setLanguage, getTheme, setTheme, type Language, type Theme } from '@/lib/storage/settingsStore';
+import { useAuth } from '@/lib/auth/AuthContext';
+import { setLanguage, type Language, type Theme } from '@/lib/storage/settingsStore';
+import { notifyThemeChange } from '@/hooks/use-color-scheme';
 
 const LANGUAGES: { id: Language; label: string }[] = [
   { id: 'vi', label: 'Tiếng Việt' },
@@ -45,22 +47,18 @@ function PillOption({ label, selected, onSelect }: {
 export default function SettingsScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { user, refreshUser } = useAuth();
 
   const [language, setLanguageState] = useState<Language>('vi');
   const [theme, setThemeState] = useState<Theme>('system');
-  const [pushEnabled, setPushEnabled] = useState(true);
-  const [emailEnabled, setEmailEnabled] = useState(true);
-  const [loaded, setLoaded] = useState(false);
+  const [pushEnabled, setPushEnabled] = useState(user?.preferences?.pushEnabled !== false);
+  const [emailEnabled, setEmailEnabled] = useState(user?.preferences?.emailEnabled !== false);
 
+  // Sync toggles when AuthContext.user changes (e.g. after login)
   useEffect(() => {
-    (async () => {
-      const lang = await getLanguage();
-      const th = await getTheme();
-      setLanguageState(lang);
-      setThemeState(th);
-      setLoaded(true);
-    })();
-  }, []);
+    setPushEnabled(user?.preferences?.pushEnabled !== false);
+    setEmailEnabled(user?.preferences?.emailEnabled !== false);
+  }, [user?.preferences?.pushEnabled, user?.preferences?.emailEnabled]);
 
   const handleLanguageChange = async (lang: Language) => {
     setLanguageState(lang);
@@ -69,10 +67,11 @@ export default function SettingsScreen() {
 
   const handleThemeChange = async (th: Theme) => {
     setThemeState(th);
-    await setTheme(th);
+    await notifyThemeChange(th);
   };
 
   const handleToggleNotification = async (key: 'pushEnabled' | 'emailEnabled', value: boolean) => {
+    const prev = key === 'pushEnabled' ? pushEnabled : emailEnabled;
     if (key === 'pushEnabled') setPushEnabled(value);
     else setEmailEnabled(value);
     try {
@@ -80,12 +79,13 @@ export default function SettingsScreen() {
         method: 'PATCH',
         body: { preferences: { [key]: value } },
       });
+      await refreshUser();
     } catch {
+      if (key === 'pushEnabled') setPushEnabled(prev);
+      else setEmailEnabled(prev);
       Alert.alert('Lỗi', 'Không thể cập nhật cài đặt thông báo');
     }
   };
-
-  if (!loaded) return null;
 
   return (
     <Animated.View style={[styles.screen, { paddingTop: insets.top }]}>

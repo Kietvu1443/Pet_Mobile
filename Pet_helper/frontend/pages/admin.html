@@ -1205,7 +1205,8 @@
                             <h2>Đánh giá nhà ở</h2>
                             <p class="panel-sub">Duyệt các bài đánh giá nhà ở từ người dùng.</p>
                         </div>
-                        <button class="tool-btn" data-refresh-tab="housing"><span class="material-symbols-outlined">sync</span> Tải lại</button>
+                        <button class="tool-btn" data-refresh-tab="housing"><span
+                                class="material-symbols-outlined">sync</span> Tải lại</button>
                     </div>
                     <div class="panel-state" id="housingState"></div>
                     <div class="panel-content is-hidden" id="housingContent">
@@ -1225,8 +1226,10 @@
                                 <tbody id="housingBody"></tbody>
                             </table>
                         </div>
-                        <div class="pagination-bar px-12 pb-12 flex items-center justify-between" id="housingPagination">
-                            <div class="text-slate-400 font-bold text-sm" id="housingPaginationSummary">Trang 0 / 0</div>
+                        <div class="pagination-bar px-12 pb-12 flex items-center justify-between"
+                            id="housingPagination">
+                            <div class="text-slate-400 font-bold text-sm" id="housingPaginationSummary">Trang 0 / 0
+                            </div>
                             <div class="flex gap-3">
                                 <button class="tool-btn" data-page-nav="prev" data-page-tab="housing">Trước</button>
                                 <button class="tool-btn" data-page-nav="next" data-page-tab="housing">Tiếp</button>
@@ -1279,7 +1282,8 @@
                             <h2>Trại cứu hộ</h2>
                             <p class="panel-sub">Duyệt các trại cứu hộ đăng ký từ người dùng.</p>
                         </div>
-                        <button class="tool-btn" data-refresh-tab="shelters"><span class="material-symbols-outlined">sync</span> Tải lại</button>
+                        <button class="tool-btn" data-refresh-tab="shelters"><span
+                                class="material-symbols-outlined">sync</span> Tải lại</button>
                     </div>
                     <div class="panel-state" id="sheltersState"></div>
                     <div class="panel-content is-hidden" id="sheltersContent">
@@ -1299,8 +1303,10 @@
                                 <tbody id="sheltersBody"></tbody>
                             </table>
                         </div>
-                        <div class="pagination-bar px-12 pb-12 flex items-center justify-between" id="sheltersPagination">
-                            <div class="text-slate-400 font-bold text-sm" id="sheltersPaginationSummary">Trang 0 / 0</div>
+                        <div class="pagination-bar px-12 pb-12 flex items-center justify-between"
+                            id="sheltersPagination">
+                            <div class="text-slate-400 font-bold text-sm" id="sheltersPaginationSummary">Trang 0 / 0
+                            </div>
                             <div class="flex gap-3">
                                 <button class="tool-btn" data-page-nav="prev" data-page-tab="shelters">Trước</button>
                                 <button class="tool-btn" data-page-nav="next" data-page-tab="shelters">Tiếp</button>
@@ -1811,7 +1817,7 @@
                 if (tab === 'housing') {
                     const reviewedBy = row.reviewed_by ? `#${row.reviewed_by}` : '-';
                     const houseTypeLabel = { apartment: 'Căn hộ', rental: 'Phòng thuê', house: 'Nhà riêng', townhouse: 'Nhà phố', other: 'Khác' };
-                    return `<tr><td><span class="font-mono text-xs font-bold text-slate-300">#${row.id}</span></td><td><div class="font-black text-slate-800">${escapeHtml(row.display_name || row.name || 'User')}</div><div style="font-size:0.75rem;color:#64748b;">${escapeHtml(row.email || '')}</div></td><td><span class="font-bold text-slate-500">${houseTypeLabel[row.house_type] || row.house_type || '-'}</span></td><td><span class="status-pill ${row.status}">${row.status}</span></td><td>${formatDate(row.created_at)}</td><td><span class="text-slate-400 text-sm">${reviewedBy}</span></td><td>${row.status === 'pending' ? `<button class="action-btn approve" data-action="status-shelter" data-id="${row.id}" data-next="approved">Duyệt</button> <button class="action-btn reject" data-action="status-shelter" data-id="${row.id}" data-next="rejected">Từ chối</button>` : ''} <button class="action-btn info" data-action="detail-shelters" data-id="${row.id}">Chi tiết</button></td></tr>`;
+                    return `<tr><td><span class="font-mono text-xs font-bold text-slate-300">#${row.id}</span></td><td><div class="font-black text-slate-800">${escapeHtml(row.display_name || row.name || 'User')}</div><div style="font-size:0.75rem;color:#64748b;">${escapeHtml(row.email || '')}</div></td><td><span class="font-bold text-slate-500">${houseTypeLabel[row.house_type] || row.house_type || '-'}</span></td><td><span class="status-pill ${row.status}">${row.status}</span></td><td>${formatDate(row.created_at)}</td><td><span class="text-slate-400 text-sm">${reviewedBy}</span></td><td>${row.status === 'pending' ? `<button class="action-btn approve" data-action="status-housing" data-id="${row.id}" data-next="approved">Duyệt</button> <button class="action-btn reject" data-action="status-housing" data-id="${row.id}" data-next="rejected">Từ chối</button>` : ''} <button class="action-btn info" data-action="detail-housing" data-id="${row.id}">Chi tiết</button></td></tr>`;
                 }
                 if (tab === 'shelters') {
                     const reviewedBy = row.reviewed_by ? `#${row.reviewed_by}` : '-';

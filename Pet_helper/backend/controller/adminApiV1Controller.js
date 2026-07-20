@@ -4,6 +4,8 @@ const HousingReview = require("../models/HousingReview");
 const Shelter = require("../models/Shelter");
 const { pool } = require("../config/db");
 const { sendSuccess, sendError } = require("../utils/apiResponse");
+const notificationService = require("../service/notificationService");
+const NOTIF_TYPES = require("../shared/constants/notificationTypes");
 
 const ALLOWED_STATUSES = ["active", "banned"];
 const ALLOWED_ROLES = [1, 2]; // Admin (0) cannot be assigned via API
@@ -332,6 +334,17 @@ const adminApiV1Controller = {
         return sendError(res, 500, "Không thể cập nhật trạng thái bài đánh giá");
       }
 
+      const notifKey = status === "approved" ? "HOUSING_APPROVED" : "HOUSING_REJECTED";
+      notificationService.send({
+        userId: review.user_id,
+        title: status === "approved" ? "✅ Đánh giá nhà ở đã được duyệt" : "❌ Đánh giá nhà ở bị từ chối",
+        message: status === "approved"
+          ? "Đánh giá nhà ở của bạn đã được duyệt. Bạn có thể tiếp tục nhận nuôi."
+          : `Đánh giá nhà ở của bạn đã bị từ chối.${adminNotes ? ` Lý do: ${adminNotes}` : ""}`,
+        type: NOTIF_TYPES[notifKey],
+        data: { reviewId, status },
+      });
+
       return sendSuccess(res, 200, status === "approved" ? "Đã duyệt bài đánh giá" : "Đã từ chối bài đánh giá", {
         data: updated,
       });
@@ -395,6 +408,17 @@ const adminApiV1Controller = {
       if (!updated) {
         return sendError(res, 500, "Không thể cập nhật trạng thái trại tạm trú");
       }
+
+      const notifKey = status === "approved" ? "SHELTER_APPROVED" : "SHELTER_REJECTED";
+      notificationService.send({
+        userId: shelter.user_id,
+        title: status === "approved" ? "✅ Trại cứu hộ đã được duyệt" : "❌ Trại cứu hộ bị từ chối",
+        message: status === "approved"
+          ? "Trại cứu hộ của bạn đã được duyệt. Bạn có thể quản lý thú cưng và nhận yêu cầu nhận nuôi."
+          : `Trại cứu hộ của bạn đã bị từ chối.${adminNotes ? ` Lý do: ${adminNotes}` : ""}`,
+        type: NOTIF_TYPES[notifKey],
+        data: { shelterId, status },
+      });
 
       return sendSuccess(res, 200, status === "approved" ? "Đã duyệt trại tạm trú" : "Đã từ chối trại tạm trú", {
         data: updated,

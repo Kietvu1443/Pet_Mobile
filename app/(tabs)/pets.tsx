@@ -19,6 +19,8 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 
+import { useUnreadNotifications } from '@/lib/notifications/unread';
+
 import {
   getMockOwnPets,
   getMockNearbyShelters,
@@ -108,6 +110,7 @@ export default function MyPetsScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const hasPets = OWN_PETS.length > 0;
+  const { unread } = useUnreadNotifications();
 
   return (
     <ScrollView
@@ -131,8 +134,13 @@ export default function MyPetsScreen() {
           </View>
         </View>
         <View style={styles.headerActions}>
-          <Pressable style={styles.iconBtn}>
+          <Pressable style={styles.iconBtn} onPress={() => router.push('/notifications')}>
             <Ionicons name="notifications-outline" size={18} color="#888" />
+            {unread > 0 && (
+              <View style={styles.notifBadge}>
+                <Text style={styles.notifBadgeText}>{unread > 99 ? '99+' : unread}</Text>
+              </View>
+            )}
           </Pressable>
           <Pressable
             style={styles.addIconBtn}
@@ -221,6 +229,17 @@ const styles = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
     shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.08, shadowRadius: 8, elevation: 3,
+    position: 'relative',
+  },
+  notifBadge: {
+    position: 'absolute', top: -4, right: -4,
+    minWidth: 18, height: 18, borderRadius: 9,
+    backgroundColor: '#FF4D4F',
+    alignItems: 'center', justifyContent: 'center',
+    paddingHorizontal: 4,
+  },
+  notifBadgeText: {
+    color: 'white', fontSize: 10, fontWeight: '800',
   },
   addIconBtn: {
     width: 44, height: 44, borderRadius: 14,

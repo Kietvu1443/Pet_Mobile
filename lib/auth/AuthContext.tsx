@@ -9,6 +9,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState, t
 import { setUnauthorizedHandler } from '../api/client';
 import { getMe, login as apiLogin, register as apiRegister, type RegisterData, type User } from '../api/auth';
 import { registerDevicePushToken, unregisterDevicePushToken } from '../notifications/device';
+import { resetGlobalUnread } from '../notifications/unread';
 import { clearToken, getToken, saveToken } from './tokenStore';
 
 type AuthContextValue = {
@@ -38,7 +39,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
       try {
         const me = await getMe();
-        if (mounted) setUser(me);
+        if (mounted) {
+          setUser(me);
+          void registerDevicePushToken().catch(err => console.warn('[Push] Startup registration failed:', err));
+        }
       } catch {
         // Token hỏng/hết hạn -> xoá phiên (A3).
         await clearToken();
@@ -55,6 +59,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Handler 401 tập trung (A3): client gọi khi gặp 401 -> xoá token + user.
   useEffect(() => {
     setUnauthorizedHandler(() => {
+      resetGlobalUnread();
       void clearToken();
       setUser(null);
     });
@@ -77,7 +82,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // /auth/login returns a subset; fetch full profile from /auth/me
         const me = await getMe();
         setUser(me);
-        registerDevicePushToken();
+        void registerDevicePushToken().catch(err => console.warn('[Push] Login registration failed:', err));
       },
       register: async (data: RegisterData) => {
         const result = await apiRegister(data);
@@ -85,10 +90,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // /auth/register returns a subset; fetch full profile from /auth/me
         const me = await getMe();
         setUser(me);
-        registerDevicePushToken();
+        void registerDevicePushToken().catch(err => console.warn('[Push] Register registration failed:', err));
       },
       logout: async () => {
-        await unregisterDevicePushToken();
+        await unregisterDevicePushToken().catch(err => console.warn('[Push] Logout unregistration failed:', err));
+        resetGlobalUnread();
         await clearToken();
         setUser(null);
       },

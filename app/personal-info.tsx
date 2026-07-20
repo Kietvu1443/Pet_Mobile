@@ -90,6 +90,7 @@ export default function PersonalInfoScreen() {
       : 'female') as GenderOption,
   );
   const [phone, setPhone] = useState(user?.phone ?? '');
+  const [address, setAddress] = useState(user?.address ?? '');
   const [saving, setSaving] = useState(false);
 
   // Avatar upload state
@@ -162,6 +163,7 @@ export default function PersonalInfoScreen() {
           birthday: formatDateToBackend(birthday),
           gender: gender || null,
           phone: phone || null,
+          address: address || null,
         },
       });
       await refreshUser();
@@ -171,7 +173,7 @@ export default function PersonalInfoScreen() {
     } finally {
       setSaving(false);
     }
-  }, [saving, user, name, birthday, gender, phone, refreshUser, router]);
+  }, [saving, user, name, birthday, gender, phone, address, refreshUser, router]);
 
   return (
     <KeyboardAvoidingView
@@ -354,6 +356,21 @@ export default function PersonalInfoScreen() {
                 <Ionicons name="checkmark" size={10} color="#34C759" strokeWidth={3} />
                 <Text style={styles.verifiedText}>Đã xác minh</Text>
               </View>
+            </View>
+          </View>
+
+          {/* Address — editable */}
+          <View style={[styles.fieldWrapper, { marginBottom: 36 }]}>
+            <Text style={styles.fieldLabel}>Địa chỉ</Text>
+            <View style={styles.fieldRow}>
+              <Ionicons name="location-outline" size={16} color="#CCCCCC" />
+              <TextInput
+                style={styles.fieldInput}
+                value={address}
+                onChangeText={setAddress}
+                placeholder="Địa chỉ của bạn..."
+                placeholderTextColor="#CCCCCC"
+              />
             </View>
           </View>
 

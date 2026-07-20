@@ -22,7 +22,8 @@ export type User = {
   birthday?: string | null;
   gender?: string | null;
   phone?: string | null;
-  preferences?: { quickRole?: string } | null;
+  address?: string | null;
+  preferences?: { quickRole?: string; pushEnabled?: boolean; emailEnabled?: boolean } | null;
 };
 
 type LoginResponse = {

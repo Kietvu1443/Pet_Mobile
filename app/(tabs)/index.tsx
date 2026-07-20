@@ -36,6 +36,8 @@ import Animated, {
 import { GestureDetector, Gesture } from 'react-native-gesture-handler';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+
+import { useUnreadNotifications } from '@/lib/notifications/unread';
 import { useRouter } from 'expo-router';
 
 import { usePetQueue } from '@/lib/snap/usePetQueue';
@@ -428,6 +430,7 @@ export default function AdoptScreen() {
   const { queue, status, errorMsg, acting, like, dislike, reload } = usePetQueue();
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const { unread } = useUnreadNotifications();
 
   const [activeTab, setActiveTab] = useState<'explore' | 'connected'>('explore');
 
@@ -459,8 +462,13 @@ export default function AdoptScreen() {
           <Text style={styles.headerTitle}>Khám phá</Text>
         </View>
         <View style={styles.headerActions}>
-          <Pressable style={styles.iconBtn}>
+          <Pressable style={styles.iconBtn} onPress={() => router.push('/notifications')}>
             <Ionicons name="notifications-outline" size={18} color="#888" />
+            {unread > 0 && (
+              <View style={styles.notifBadge}>
+                <Text style={styles.notifBadgeText}>{unread > 99 ? '99+' : unread}</Text>
+              </View>
+            )}
           </Pressable>
           <Pressable style={styles.iconBtn}>
             <Ionicons name="options-outline" size={18} color="#888" />
@@ -606,6 +614,16 @@ const styles = StyleSheet.create({
     width: 8, height: 8, borderRadius: 4,
     backgroundColor: '#FF4FA3',
     borderWidth: 2, borderColor: 'white',
+  },
+  notifBadge: {
+    position: 'absolute', top: -4, right: -4,
+    minWidth: 18, height: 18, borderRadius: 9,
+    backgroundColor: '#FF4D4F',
+    alignItems: 'center', justifyContent: 'center',
+    paddingHorizontal: 4,
+  },
+  notifBadgeText: {
+    color: 'white', fontSize: 10, fontWeight: '800',
   },
   // Tabs
   tabs: {

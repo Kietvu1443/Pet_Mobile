@@ -1,8 +1,9 @@
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { SNAP_COLORS, SNAP_FONTS } from '@/constants/petsnap-theme';
+import { SNAP_FONTS } from '@/constants/petsnap-theme';
 import { formatRelativeTime } from '@/lib/utils/time';
+import { useTheme } from '@/lib/theme/ThemeContext';
 
 export type NotificationPriority = 'success' | 'warning' | 'info' | 'critical';
 
@@ -118,42 +119,49 @@ const NotificationItemComponent: React.FC<NotificationItemProps> = ({
   onPress,
   disabled = false,
 }) => {
+  const { theme } = useTheme();
   const meta = NOTIFICATION_META[item.type] || DEFAULT_META;
   const isRead = !!item.is_read;
+
+  const cardBg = isRead
+    ? theme.colors.card
+    : theme.isDark
+    ? theme.colors.primaryContainer
+    : '#FAF5FF';
 
   return (
     <Pressable
       style={({ pressed }) => [
         styles.card,
-        !isRead && styles.unreadCard,
+        { backgroundColor: cardBg, borderBottomColor: theme.colors.border },
         pressed && styles.pressed,
       ]}
       onPress={() => onPress(item)}
       disabled={disabled}
     >
       {/* Visual Category Icon */}
-      <View style={[styles.iconContainer, { backgroundColor: meta.bg }]}>
+      <View style={[styles.iconContainer, { backgroundColor: theme.isDark ? theme.colors.surface : meta.bg }]}>
         <Ionicons name={meta.icon} size={22} color={meta.color} />
       </View>
 
       {/* Texts Column */}
       <View style={styles.textContainer}>
         <View style={styles.titleRow}>
-          <Text style={[styles.title, !isRead && styles.unreadText]} numberOfLines={1}>
+          <Text style={[styles.title, { color: theme.colors.text }]} numberOfLines={1}>
             {item.title}
           </Text>
-          <Text style={styles.timeText}>
+          <Text style={[styles.timeText, { color: theme.colors.muted }]}>
             {formatRelativeTime(item.created_at)}
           </Text>
         </View>
-        <Text style={[styles.message, !isRead && styles.unreadMessage]} numberOfLines={3}>
+        <Text style={[styles.message, { color: theme.colors.muted }]} numberOfLines={3}>
           {item.message}
         </Text>
       </View>
 
       {/* Unread dot indicator */}
       {!isRead && (
-        <View style={styles.unreadDot} />
+        <View style={[styles.unreadDot, { backgroundColor: theme.colors.primary }]} />
       )}
     </Pressable>
   );
@@ -223,6 +231,5 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: SNAP_COLORS.like, // Deep Purple branding dot
   },
 });

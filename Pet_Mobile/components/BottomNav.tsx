@@ -20,6 +20,9 @@ import Animated, {
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { useTranslation } from 'react-i18next';
+
+import { useTheme } from '@/lib/theme/ThemeContext';
 
 export type Tab = 'pets' | 'adopt' | 'favorites' | 'profile';
 
@@ -32,18 +35,18 @@ type TabItem = {
   id: Tab;
   ionIcon: keyof typeof Ionicons.glyphMap;
   ionIconFilled: keyof typeof Ionicons.glyphMap;
-  label: string;
+  labelKey: 'tabs:pets' | 'tabs:adopt' | 'tabs:favorites' | 'tabs:profile';
   fillOnActive: boolean;
 };
 
 const LEFT_TABS: TabItem[] = [
-  { id: 'pets',      ionIcon: 'paw-outline',    ionIconFilled: 'paw',         label: 'Thú cưng',  fillOnActive: true  },
-  { id: 'adopt',     ionIcon: 'search-outline',  ionIconFilled: 'search',      label: 'Nhận nuôi', fillOnActive: false },
+  { id: 'pets',      ionIcon: 'paw-outline',    ionIconFilled: 'paw',         labelKey: 'tabs:pets',  fillOnActive: true  },
+  { id: 'adopt',     ionIcon: 'search-outline',  ionIconFilled: 'search',      labelKey: 'tabs:adopt', fillOnActive: false },
 ];
 
 const RIGHT_TABS: TabItem[] = [
-  { id: 'favorites', ionIcon: 'heart-outline',   ionIconFilled: 'heart',       label: 'Yêu thích', fillOnActive: true  },
-  { id: 'profile',   ionIcon: 'person-outline',  ionIconFilled: 'person',      label: 'Hồ sơ',     fillOnActive: false },
+  { id: 'favorites', ionIcon: 'heart-outline',   ionIconFilled: 'heart',       labelKey: 'tabs:favorites', fillOnActive: true  },
+  { id: 'profile',   ionIcon: 'person-outline',  ionIconFilled: 'person',      labelKey: 'tabs:profile',   fillOnActive: false },
 ];
 
 const PILL_W = 66;
@@ -56,12 +59,15 @@ function NavTab({
   isActive,
   onPress,
   onLayout,
+  mutedColor,
 }: {
   tab: TabItem;
   isActive: boolean;
   onPress: () => void;
   onLayout: (e: any) => void;
+  mutedColor: string;
 }) {
+  const { t } = useTranslation(['tabs', 'common']);
   const scale = useSharedValue(1);
 
   const animStyle = useAnimatedStyle(() => ({
@@ -82,10 +88,10 @@ function NavTab({
           <Ionicons
             name={tab.ionIcon}
             size={21}
-            color={isActive ? 'white' : 'rgba(100,100,120,0.65)'}
+            color={isActive ? 'white' : mutedColor}
           />
-          <Text style={[styles.label, isActive ? styles.activeLabel : styles.inactiveLabel]}>
-            {tab.label}
+          <Text style={[styles.label, isActive ? styles.activeLabel : { color: mutedColor }]}>
+            {t(tab.labelKey)}
           </Text>
         </View>
       </Animated.View>
@@ -98,6 +104,9 @@ export function BottomNav({ activeTab, onTabChange }: BottomNavProps) {
   const fabScale = useSharedValue(1);
   const indicatorX = useSharedValue(0);
   const hasInitialized = useRef(false);
+  const { theme, resolvedColorScheme } = useTheme();
+  const primaryColor = theme.colors.primary;
+  const isDark = resolvedColorScheme === 'dark';
 
   const tabPositions = useRef<Record<Tab, number>>({
     pets: 0,
@@ -121,7 +130,6 @@ export function BottomNav({ activeTab, onTabChange }: BottomNavProps) {
   };
 
   const handleTabLayout = useCallback((tabId: Tab, x: number, width: number) => {
-    // Lock in the coordinate once measured to prevent transition reflows from corrupting it
     if (tabPositions.current[tabId] !== 0) {
       return;
     }
@@ -131,17 +139,15 @@ export function BottomNav({ activeTab, onTabChange }: BottomNavProps) {
 
     tabPositions.current[tabId] = targetX;
     
-    // Only initialize the indicator position directly without animation on mount
     if (activeTab === tabId && !hasInitialized.current) {
       indicatorX.value = targetX;
       hasInitialized.current = true;
     }
   }, [activeTab, indicatorX]);
 
-  // Smooth slide transition when activeTab changes
   useEffect(() => {
     const targetX = tabPositions.current[activeTab];
-    if (hasInitialized.current && typeof targetX === 'number' && targetX !== 0) {
+    if (targetX > 0) {
       indicatorX.value = withSpring(targetX, {
         stiffness: 160,
         damping: 26,
@@ -157,25 +163,37 @@ export function BottomNav({ activeTab, onTabChange }: BottomNavProps) {
       ]}
       pointerEvents="box-none"
     >
-      <BlurView intensity={50} tint="light" style={styles.glassPill}>
-        <Animated.View style={[styles.activePillIndicator, indicatorStyle]} />
+      <BlurView
+        intensity={50}
+        tint={isDark ? 'dark' : 'light'}
+        style={[
+          styles.glassPill,
+          {
+            backgroundColor: isDark ? 'rgba(30,30,30,0.85)' : 'rgba(255,255,255,0.85)',
+            borderColor: theme.colors.border,
+          },
+        ]}
+      >
+        <Animated.View style={[styles.activePillIndicator, { backgroundColor: primaryColor, shadowColor: primaryColor }, indicatorStyle]} />
 
         <NavTab
           tab={LEFT_TABS[0]}
           isActive={activeTab === LEFT_TABS[0].id}
           onPress={() => onTabChange(LEFT_TABS[0].id)}
           onLayout={(e) => handleTabLayout(LEFT_TABS[0].id, e.nativeEvent.layout.x, e.nativeEvent.layout.width)}
+          mutedColor={theme.colors.muted}
         />
         <NavTab
           tab={LEFT_TABS[1]}
           isActive={activeTab === LEFT_TABS[1].id}
           onPress={() => onTabChange(LEFT_TABS[1].id)}
           onLayout={(e) => handleTabLayout(LEFT_TABS[1].id, e.nativeEvent.layout.x, e.nativeEvent.layout.width)}
+          mutedColor={theme.colors.muted}
         />
 
         <View style={styles.inlineFabWrapper}>
           <Pressable onPress={handleFabPress}>
-            <Animated.View style={[styles.fab, fabStyle]}>
+            <Animated.View style={[styles.fab, { backgroundColor: primaryColor, shadowColor: primaryColor }, fabStyle]}>
               <Ionicons name="scan-outline" size={20} color="white" />
             </Animated.View>
           </Pressable>
@@ -186,12 +204,14 @@ export function BottomNav({ activeTab, onTabChange }: BottomNavProps) {
           isActive={activeTab === RIGHT_TABS[0].id}
           onPress={() => onTabChange(RIGHT_TABS[0].id)}
           onLayout={(e) => handleTabLayout(RIGHT_TABS[0].id, e.nativeEvent.layout.x, e.nativeEvent.layout.width)}
+          mutedColor={theme.colors.muted}
         />
         <NavTab
           tab={RIGHT_TABS[1]}
           isActive={activeTab === RIGHT_TABS[1].id}
           onPress={() => onTabChange(RIGHT_TABS[1].id)}
           onLayout={(e) => handleTabLayout(RIGHT_TABS[1].id, e.nativeEvent.layout.x, e.nativeEvent.layout.width)}
+          mutedColor={theme.colors.muted}
         />
       </BlurView>
     </View>
@@ -237,9 +257,7 @@ const styles = StyleSheet.create({
     top: 9,
     width: PILL_W,
     height: PILL_H,
-    backgroundColor: '#FF4FA3',
     borderRadius: 14,
-    shadowColor: '#FF4FA3',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.38,
     shadowRadius: 10,
@@ -273,12 +291,10 @@ const styles = StyleSheet.create({
     width: FAB_SIZE,
     height: FAB_SIZE,
     borderRadius: FAB_SIZE / 2,
-    backgroundColor: '#FF3D9A',
     borderWidth: 2,
     borderColor: 'rgba(255,255,255,0.90)',
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#FF3D9A',
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.50,
     shadowRadius: 16,

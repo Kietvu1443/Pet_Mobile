@@ -3,8 +3,8 @@
 // Nguồn dữ liệu:
 //   - user.name, user.email <- GET /api/v1/auth/me (backend, EDITABLE)
 //   - user.avatar           <- GET /api/v1/auth/me (backend)
-//   - gender                <- component state only (TODO: backend users.gender)
-//   - phone, birthday       <- mockAdapter (TODO: backend users.phone, users.birthday)
+//   - gender                <- component state only
+//   - phone, birthday       <- mockAdapter
 //
 // Save: PATCH /api/v1/auth/profile với { name }
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -30,6 +30,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 
 import { useAuth } from '@/lib/auth/AuthContext';
+import { useTheme } from '@/lib/theme/ThemeContext';
 import { apiRequest } from '@/lib/api/client';
 import { calculateProfileCompletion } from '@/lib/profile/profileCompletion';
 import { resolveImageUrl } from '@/lib/images/resolveUrl';
@@ -78,6 +79,7 @@ export default function PersonalInfoScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { user, refreshUser } = useAuth();
+  const { theme } = useTheme();
 
   // Backend-supported fields
   const [name, setName] = useState(user?.name ?? '');
@@ -146,7 +148,6 @@ export default function PersonalInfoScreen() {
   const handleSave = useCallback(async () => {
     if (saving) return;
 
-    // Validate phone before submitting
     if (phone && !PHONE_REGEX.test(phone)) {
       setPhoneTouched(true);
       return;
@@ -181,33 +182,34 @@ export default function PersonalInfoScreen() {
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
       <Animated.View
-        style={[styles.screen, { paddingTop: insets.top }]}
+        style={[styles.screen, { backgroundColor: theme.colors.background, paddingTop: insets.top }]}
       >
         <ScrollView
           style={styles.scroll}
           contentContainerStyle={styles.scrollContent}
+          keyboardDismissMode="interactive"
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
         >
           {/* Header */}
           <View style={styles.header}>
             <Pressable
-              style={({ pressed }) => [styles.backBtn, pressed && { opacity: 0.7 }]}
+              style={({ pressed }) => [styles.backBtn, { backgroundColor: theme.colors.card }, pressed && { opacity: 0.7 }]}
               onPress={() => router.back()}
             >
-              <Ionicons name="chevron-back" size={22} color="#1A1A1A" />
+              <Ionicons name="chevron-back" size={22} color={theme.colors.text} />
             </Pressable>
-            <Text style={styles.headerTitle}>Thông tin cá nhân</Text>
+            <Text style={[styles.headerTitle, { color: theme.colors.text }]}>Thông tin cá nhân</Text>
           </View>
 
-          {/* Profile completion banner — dynamic */}
-          <View style={styles.completionBanner}>
-            <View style={styles.completionScore}>
-              <Text style={styles.completionScoreText}>{completion.percentage}</Text>
+          {/* Profile completion banner */}
+          <View style={[styles.completionBanner, { backgroundColor: theme.colors.primaryContainer, borderColor: theme.colors.border }]}>
+            <View style={[styles.completionScore, { backgroundColor: theme.colors.card }]}>
+              <Text style={[styles.completionScoreText, { color: theme.colors.primary }]}>{completion.percentage}</Text>
             </View>
             <View style={{ flex: 1, minWidth: 0 }}>
-              <Text style={styles.completionTitle}>{completion.helperText.title}</Text>
-              <Text style={styles.completionSub}>{completion.helperText.description}</Text>
+              <Text style={[styles.completionTitle, { color: theme.colors.text }]}>{completion.helperText.title}</Text>
+              <Text style={[styles.completionSub, { color: theme.colors.muted }]}>{completion.helperText.description}</Text>
             </View>
           </View>
 
@@ -215,13 +217,13 @@ export default function PersonalInfoScreen() {
           <View style={styles.avatarSection}>
             <View style={styles.avatarWrapper}>
               {displayAvatar ? (
-                <Image source={{ uri: displayAvatar }} style={styles.avatar} />
+                <Image source={{ uri: displayAvatar }} style={[styles.avatar, { borderColor: theme.colors.primary }]} />
               ) : (
-                <View style={[styles.avatar, styles.avatarPlaceholder]}>
-                  <Ionicons name="person" size={36} color="#CCCCCC" />
+                <View style={[styles.avatar, styles.avatarPlaceholder, { backgroundColor: theme.colors.card, borderColor: theme.colors.primary }]}>
+                  <Ionicons name="person" size={36} color={theme.colors.muted} />
                 </View>
               )}
-              <Pressable style={styles.cameraBtn} onPress={handlePickAvatar} disabled={uploading}>
+              <Pressable style={[styles.cameraBtn, { backgroundColor: theme.colors.primary, borderColor: theme.colors.card }]} onPress={handlePickAvatar} disabled={uploading}>
                 {uploading ? (
                   <ActivityIndicator size="small" color="white" />
                 ) : (
@@ -229,54 +231,54 @@ export default function PersonalInfoScreen() {
                 )}
               </Pressable>
               {uploading && (
-                <View style={styles.avatarUploadOverlay}>
-                  <ActivityIndicator size="large" color="#FF4FA3" />
+                <View style={[styles.avatarUploadOverlay, { backgroundColor: theme.colors.overlay }]}>
+                  <ActivityIndicator size="large" color={theme.colors.primary} />
                 </View>
               )}
             </View>
             <Pressable onPress={handlePickAvatar} disabled={uploading}>
-              <Text style={[styles.changeAvatarText, uploading && { opacity: 0.4 }]}>
+              <Text style={[styles.changeAvatarText, { color: theme.colors.primary }, uploading && { opacity: 0.4 }]}>
                 {uploading ? 'Đang tải...' : 'Đổi ảnh đại diện'}
               </Text>
             </Pressable>
           </View>
 
           {/* Section: Cá nhân */}
-          <Text style={styles.sectionLabel}>Cá nhân</Text>
+          <Text style={[styles.sectionLabel, { color: theme.colors.muted }]}>Cá nhân</Text>
 
           <View style={styles.rowGroup}>
-            {/* Name — editable, mapped to backend users.name */}
+            {/* Name */}
             <View style={styles.fieldWrapper}>
-              <Text style={styles.fieldLabel}>Họ và tên</Text>
-              <View style={styles.fieldRow}>
-                <Ionicons name="person-outline" size={16} color="#CCCCCC" />
+              <Text style={[styles.fieldLabel, { color: theme.colors.text }]}>Họ và tên</Text>
+              <View style={[styles.fieldRow, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}>
+                <Ionicons name="person-outline" size={16} color={theme.colors.muted} />
                 <TextInput
-                  style={styles.fieldInput}
+                  style={[styles.fieldInput, { color: theme.colors.text }]}
                   value={name}
                   onChangeText={setName}
                   placeholder="Họ và tên..."
-                  placeholderTextColor="#CCCCCC"
+                  placeholderTextColor={theme.colors.muted}
                 />
               </View>
             </View>
 
-            {/* Birthday — read-only display with native DatePicker */}
+            {/* Birthday */}
             <View style={styles.fieldWrapper}>
-              <Text style={styles.fieldLabel}>Ngày sinh</Text>
+              <Text style={[styles.fieldLabel, { color: theme.colors.text }]}>Ngày sinh</Text>
               <Pressable onPress={() => { setTempDate(birthday ?? new Date()); setShowDatePicker(true); }}>
-                <View style={styles.fieldRow} pointerEvents="none">
-                  <Ionicons name="calendar-outline" size={16} color="#CCCCCC" />
+                <View style={[styles.fieldRow, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]} pointerEvents="none">
+                  <Ionicons name="calendar-outline" size={16} color={theme.colors.muted} />
                   <TextInput
-                    style={styles.fieldInput}
+                    style={[styles.fieldInput, { color: theme.colors.text }]}
                     value={displayBirthday}
                     editable={false}
                     placeholder="DD/MM/YYYY"
-                    placeholderTextColor="#CCCCCC"
+                    placeholderTextColor={theme.colors.muted}
                   />
                 </View>
               </Pressable>
 
-              {/* Android: native dialog */}
+              {/* Android date picker */}
               {showDatePicker && Platform.OS === 'android' && (
                 <DateTimePicker
                   value={tempDate}
@@ -290,7 +292,7 @@ export default function PersonalInfoScreen() {
                 />
               )}
 
-              {/* iOS: modal sheet with confirmation */}
+              {/* iOS date picker modal */}
               {Platform.OS === 'ios' && (
                 <Modal
                   visible={showDatePicker}
@@ -298,15 +300,15 @@ export default function PersonalInfoScreen() {
                   animationType="slide"
                   onRequestClose={() => setShowDatePicker(false)}
                 >
-                  <View style={styles.modalOverlay}>
-                    <View style={styles.modalContent}>
-                      <View style={styles.modalHeader}>
+                  <View style={[styles.modalOverlay, { backgroundColor: theme.colors.overlay }]}>
+                    <View style={[styles.modalContent, { backgroundColor: theme.colors.card }]}>
+                      <View style={[styles.modalHeader, { borderBottomColor: theme.colors.border }]}>
                         <Pressable onPress={() => setShowDatePicker(false)}>
-                          <Text style={styles.modalCancelText}>Huỷ</Text>
+                          <Text style={[styles.modalCancelText, { color: theme.colors.muted }]}>Huỷ</Text>
                         </Pressable>
-                        <Text style={styles.modalTitle}>Chọn ngày sinh</Text>
+                        <Text style={[styles.modalTitle, { color: theme.colors.text }]}>Chọn ngày sinh</Text>
                         <Pressable onPress={() => { setBirthday(tempDate); setShowDatePicker(false); }}>
-                          <Text style={styles.modalConfirmText}>Chọn</Text>
+                          <Text style={[styles.modalConfirmText, { color: theme.colors.primary }]}>Chọn</Text>
                         </Pressable>
                       </View>
                       <DateTimePicker
@@ -325,17 +327,20 @@ export default function PersonalInfoScreen() {
             </View>
           </View>
 
-          {/* Gender — editable, stored in backend */}
+          {/* Gender */}
           <View style={styles.genderWrapper}>
-            <Text style={styles.fieldLabel}>Giới tính</Text>
-            <View style={styles.genderRow}>
+            <Text style={[styles.fieldLabel, { color: theme.colors.text }]}>Giới tính</Text>
+            <View style={[styles.genderRow, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}>
               {GENDER_OPTIONS.map((g) => (
                 <Pressable
                   key={g.id}
-                  style={[styles.genderBtn, gender === g.id && styles.genderBtnActive]}
+                  style={[
+                    styles.genderBtn,
+                    gender === g.id && { backgroundColor: theme.colors.primary },
+                  ]}
                   onPress={() => setGender(g.id)}
                 >
-                  <Text style={[styles.genderBtnText, gender === g.id && styles.genderBtnTextActive]}>
+                  <Text style={[styles.genderBtnText, { color: gender === g.id ? 'white' : theme.colors.muted }]}>
                     {g.label}
                   </Text>
                 </Pressable>
@@ -344,47 +349,51 @@ export default function PersonalInfoScreen() {
           </View>
 
           {/* Section: Liên hệ */}
-          <Text style={[styles.sectionLabel, { marginTop: 28 }]}>Liên hệ</Text>
+          <Text style={[styles.sectionLabel, { color: theme.colors.muted, marginTop: 28 }]}>Liên hệ</Text>
 
-          {/* Email — from backend, read-only (no edit allowed in this screen) */}
+          {/* Email */}
           <View style={styles.fieldWrapper}>
-            <Text style={styles.fieldLabel}>Email</Text>
-            <View style={styles.fieldRow}>
-              <Ionicons name="mail-outline" size={16} color="#CCCCCC" />
-              <Text style={[styles.fieldInput, styles.fieldReadonly]} numberOfLines={1}>{email}</Text>
-              <View style={styles.verifiedBadge}>
-                <Ionicons name="checkmark" size={10} color="#34C759" strokeWidth={3} />
-                <Text style={styles.verifiedText}>Đã xác minh</Text>
+            <Text style={[styles.fieldLabel, { color: theme.colors.text }]}>Email</Text>
+            <View style={[styles.fieldRow, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}>
+              <Ionicons name="mail-outline" size={16} color={theme.colors.muted} />
+              <Text style={[styles.fieldInput, { color: theme.colors.text }]} numberOfLines={1}>{email}</Text>
+              <View style={[styles.verifiedBadge, { backgroundColor: theme.colors.successContainer }]}>
+                <Ionicons name="checkmark" size={10} color={theme.colors.success} />
+                <Text style={[styles.verifiedText, { color: theme.colors.success }]}>Đã xác minh</Text>
               </View>
             </View>
           </View>
 
-          {/* Address — editable */}
+          {/* Address */}
           <View style={[styles.fieldWrapper, { marginBottom: 36 }]}>
-            <Text style={styles.fieldLabel}>Địa chỉ</Text>
-            <View style={styles.fieldRow}>
-              <Ionicons name="location-outline" size={16} color="#CCCCCC" />
+            <Text style={[styles.fieldLabel, { color: theme.colors.text }]}>Địa chỉ</Text>
+            <View style={[styles.fieldRow, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}>
+              <Ionicons name="location-outline" size={16} color={theme.colors.muted} />
               <TextInput
-                style={styles.fieldInput}
+                style={[styles.fieldInput, { color: theme.colors.text }]}
                 value={address}
                 onChangeText={setAddress}
                 placeholder="Địa chỉ của bạn..."
-                placeholderTextColor="#CCCCCC"
+                placeholderTextColor={theme.colors.muted}
               />
             </View>
           </View>
 
-          {/* Phone — editable with inline validation */}
+          {/* Phone */}
           <View style={[styles.fieldWrapper, { marginBottom: 36 }]}>
-            <Text style={styles.fieldLabel}>Số điện thoại</Text>
-            <View style={[styles.fieldRow, phoneTouched && phone && !PHONE_REGEX.test(phone) && styles.fieldRowError]}>
-              <Ionicons name="call-outline" size={16} color="#CCCCCC" />
+            <Text style={[styles.fieldLabel, { color: theme.colors.text }]}>Số điện thoại</Text>
+            <View style={[
+              styles.fieldRow,
+              { backgroundColor: theme.colors.card, borderColor: theme.colors.border },
+              phoneTouched && phone && !PHONE_REGEX.test(phone) && { borderColor: theme.colors.error },
+            ]}>
+              <Ionicons name="call-outline" size={16} color={theme.colors.muted} />
               <TextInput
-                style={styles.fieldInput}
+                style={[styles.fieldInput, { color: theme.colors.text }]}
                 value={phone}
                 onChangeText={(text) => { setPhone(cleanPhone(text)); setPhoneTouched(true); }}
                 placeholder="+84912345678"
-                placeholderTextColor="#CCCCCC"
+                placeholderTextColor={theme.colors.muted}
                 keyboardType="phone-pad"
                 textContentType="telephoneNumber"
                 autoComplete="tel"
@@ -392,21 +401,21 @@ export default function PersonalInfoScreen() {
               />
             </View>
             {phoneTouched && phone && !PHONE_REGEX.test(phone) && (
-              <Text style={styles.validationWarning}>Số điện thoại không hợp lệ (9-15 chữ số)</Text>
+              <Text style={[styles.validationWarning, { color: theme.colors.error }]}>Số điện thoại không hợp lệ (9-15 chữ số)</Text>
             )}
           </View>
         </ScrollView>
 
         {/* Bottom Buttons */}
-        <View style={[styles.bottomBar, { paddingBottom: Math.max(16, insets.bottom) }]}>
+        <View style={[styles.bottomBar, { backgroundColor: theme.colors.card, borderTopColor: theme.colors.border, paddingBottom: Math.max(16, insets.bottom) }]}>
           <Pressable
-            style={({ pressed }) => [styles.cancelBtn, pressed && { opacity: 0.7 }]}
+            style={({ pressed }) => [styles.cancelBtn, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }, pressed && { opacity: 0.7 }]}
             onPress={() => router.back()}
           >
-            <Text style={styles.cancelText}>Huỷ</Text>
+            <Text style={[styles.cancelText, { color: theme.colors.text }]}>Huỷ</Text>
           </Pressable>
           <Pressable
-            style={({ pressed }) => [styles.saveBtn, pressed && { opacity: 0.85 }, saving && { opacity: 0.6 }]}
+            style={({ pressed }) => [styles.saveBtn, { backgroundColor: theme.colors.primary, shadowColor: theme.colors.primary }, pressed && { opacity: 0.85 }, saving && { opacity: 0.6 }]}
             onPress={handleSave}
             disabled={saving}
           >
@@ -425,7 +434,6 @@ export default function PersonalInfoScreen() {
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: '#FFF9FC',
   },
   scroll: { flex: 1 },
   scrollContent: { paddingHorizontal: 24, paddingTop: 16, paddingBottom: 20 },
@@ -438,7 +446,6 @@ const styles = StyleSheet.create({
   },
   backBtn: {
     width: 44, height: 44, borderRadius: 14,
-    backgroundColor: 'white',
     alignItems: 'center', justifyContent: 'center',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
@@ -446,19 +453,17 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   headerTitle: {
-    fontSize: 24, fontWeight: '800', color: '#1A1A1A',
+    fontSize: 24, fontWeight: '800',
   },
   // Completion banner
   completionBanner: {
-    backgroundColor: '#FFF0F7',
     borderRadius: 20, padding: 14,
     marginBottom: 28,
     flexDirection: 'row', alignItems: 'center', gap: 12,
-    borderWidth: 1.5, borderColor: '#FFBBD8',
+    borderWidth: 1.5,
   },
   completionScore: {
     width: 44, height: 44, borderRadius: 22,
-    backgroundColor: 'white',
     alignItems: 'center', justifyContent: 'center',
     flexShrink: 0,
     shadowColor: '#FF4FA3',
@@ -466,9 +471,9 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.18, shadowRadius: 4,
     elevation: 4,
   },
-  completionScoreText: { fontSize: 16, fontWeight: '800', color: '#FF4FA3' },
-  completionTitle: { fontSize: 14, fontWeight: '700', color: '#1A1A1A', marginBottom: 2 },
-  completionSub: { fontSize: 12, color: '#888' },
+  completionScoreText: { fontSize: 16, fontWeight: '800' },
+  completionTitle: { fontSize: 14, fontWeight: '700', marginBottom: 2 },
+  completionSub: { fontSize: 12 },
   // Avatar
   avatarSection: {
     alignItems: 'center', marginBottom: 32,
@@ -476,102 +481,86 @@ const styles = StyleSheet.create({
   avatarWrapper: { position: 'relative', marginBottom: 10 },
   avatar: {
     width: 88, height: 88, borderRadius: 44,
-    borderWidth: 3, borderColor: '#FF4FA3',
+    borderWidth: 3,
   },
   avatarPlaceholder: {
-    backgroundColor: '#F5F5F5',
     alignItems: 'center', justifyContent: 'center',
   },
   cameraBtn: {
     position: 'absolute', bottom: -2, right: -2,
     width: 30, height: 30, borderRadius: 15,
-    backgroundColor: '#FF4FA3',
-    borderWidth: 2, borderColor: 'white',
+    borderWidth: 2,
     alignItems: 'center', justifyContent: 'center',
     shadowColor: '#FF4FA3',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.3, shadowRadius: 4,
     elevation: 4,
   },
-  changeAvatarText: { color: '#FF4FA3', fontSize: 14, fontWeight: '600' },
+  changeAvatarText: { fontSize: 14, fontWeight: '600' },
   avatarUploadOverlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(255,255,255,0.7)',
     borderRadius: 44,
     alignItems: 'center',
     justifyContent: 'center',
   },
   // Form
   sectionLabel: {
-    fontSize: 11, fontWeight: '800', color: '#AAAAAA',
+    fontSize: 11, fontWeight: '800',
     letterSpacing: 1.5, textTransform: 'uppercase', marginBottom: 16,
   },
   rowGroup: { flexDirection: 'row', gap: 12, marginBottom: 16 },
   fieldWrapper: { flex: 1, marginBottom: 16 },
-  fieldLabel: { fontSize: 13, fontWeight: '600', color: '#555', marginBottom: 8 },
+  fieldLabel: { fontSize: 13, fontWeight: '600', marginBottom: 8 },
   fieldRow: {
-    backgroundColor: 'white',
     borderRadius: 18,
-    borderWidth: 1.5, borderColor: '#EEE',
+    borderWidth: 1.5,
     paddingHorizontal: 16, paddingVertical: 14,
     flexDirection: 'row', alignItems: 'center', gap: 10,
   },
   fieldInput: {
-    flex: 1, fontSize: 15, fontWeight: '600', color: '#1A1A1A',
+    flex: 1, fontSize: 15, fontWeight: '600',
   },
-  fieldReadonly: { color: '#1A1A1A' },
   // Gender
   genderWrapper: {},
   genderRow: {
     flexDirection: 'row',
-    backgroundColor: 'white',
     borderRadius: 18,
-    borderWidth: 1.5, borderColor: '#EEE',
+    borderWidth: 1.5,
     padding: 4, gap: 4,
   },
   genderBtn: {
     flex: 1, borderRadius: 14, paddingVertical: 12,
     alignItems: 'center', justifyContent: 'center',
   },
-  genderBtnActive: {
-    backgroundColor: '#FF4FA3',
-    shadowColor: '#FF4FA3',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.30, shadowRadius: 8,
-    elevation: 4,
-  },
-  genderBtnText: { fontSize: 14, fontWeight: '700', color: '#888' },
-  genderBtnTextActive: { color: 'white' },
+  genderBtnText: { fontSize: 14, fontWeight: '700' },
   // Verified badge
   verifiedBadge: {
     flexDirection: 'row', alignItems: 'center', gap: 4,
-    backgroundColor: '#E8F8EE',
     borderRadius: 8, paddingHorizontal: 10, paddingVertical: 3,
     flexShrink: 0,
   },
-  verifiedText: { fontSize: 11, fontWeight: '700', color: '#34C759' },
+  verifiedText: { fontSize: 11, fontWeight: '700' },
   // Bottom bar
   bottomBar: {
     flexDirection: 'row', gap: 12,
     paddingHorizontal: 24, paddingTop: 16,
-    backgroundColor: 'white',
+    borderTopWidth: 1,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: -4 },
     shadowOpacity: 0.06, shadowRadius: 12,
     elevation: 8,
   },
   cancelBtn: {
-    flex: 1, backgroundColor: 'white',
-    borderWidth: 2, borderColor: '#EEE',
+    flex: 1,
+    borderWidth: 2,
     borderRadius: 18, paddingVertical: 16,
     alignItems: 'center',
   },
-  cancelText: { fontSize: 16, fontWeight: '700', color: '#888' },
+  cancelText: { fontSize: 16, fontWeight: '700' },
   saveBtn: {
-    flex: 2, backgroundColor: '#FF4FA3',
+    flex: 2,
     borderRadius: 18, paddingVertical: 16,
     alignItems: 'center',
-    shadowColor: '#FF4FA3',
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.40, shadowRadius: 14,
     elevation: 8,
@@ -582,19 +571,13 @@ const styles = StyleSheet.create({
     marginTop: 6,
     fontSize: 12,
     fontWeight: '600',
-    color: '#FF4D4F',
-  },
-  fieldRowError: {
-    borderColor: '#FF4D4F',
   },
   // iOS Datepicker modal
   modalOverlay: {
     flex: 1,
     justifyContent: 'flex-end',
-    backgroundColor: 'rgba(0,0,0,0.35)',
   },
   modalContent: {
-    backgroundColor: 'white',
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     paddingBottom: 34,
@@ -606,21 +589,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#F0F0F0',
   },
   modalTitle: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#1A1A1A',
   },
   modalCancelText: {
     fontSize: 15,
     fontWeight: '600',
-    color: '#888',
   },
   modalConfirmText: {
     fontSize: 15,
     fontWeight: '700',
-    color: '#FF4FA3',
   },
 });

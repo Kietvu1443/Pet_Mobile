@@ -12,6 +12,8 @@
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import {
+  KeyboardAvoidingView,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -21,6 +23,8 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+
+import { useTheme } from '@/lib/theme/ThemeContext';
 
 const TRAITS_SUGGESTIONS = [
   'Hiền lành', 'Năng động', 'Yêu trẻ con', 'Trầm tính',
@@ -37,8 +41,9 @@ type Species = 'cat' | 'dog' | 'other';
 type Gender = 'male' | 'female';
 
 function FormLabel({ children, inline }: { children: string; inline?: boolean }) {
+  const { theme } = useTheme();
   return (
-    <Text style={[styles.formLabel, inline && { marginBottom: 0 }]}>{children}</Text>
+    <Text style={[styles.formLabel, { color: theme.colors.muted }, inline && { marginBottom: 0 }]}>{children}</Text>
   );
 }
 
@@ -53,13 +58,14 @@ function FormInput({
   placeholder: string;
   keyboardType?: 'default' | 'numeric';
 }) {
+  const { theme } = useTheme();
   return (
     <TextInput
-      style={styles.formInput}
+      style={[styles.formInput, { backgroundColor: theme.colors.card, borderColor: theme.colors.border, color: theme.colors.text }]}
       value={value}
       onChangeText={onChangeText}
       placeholder={placeholder}
-      placeholderTextColor="#CCCCCC"
+      placeholderTextColor={theme.colors.muted}
       keyboardType={keyboardType}
     />
   );
@@ -287,6 +293,7 @@ function Step3({ name, breed, species, gender, traits }: {
 export default function AddPetScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { theme } = useTheme();
 
   const [step, setStep] = useState(1);
   const [species, setSpecies] = useState<Species>('cat');
@@ -322,24 +329,28 @@ export default function AddPetScreen() {
   };
 
   return (
-    <View style={[styles.screen, { paddingTop: insets.top }]}>
+    <KeyboardAvoidingView
+      style={{ flex: 1 }}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+    >
+    <View style={[styles.screen, { backgroundColor: theme.colors.background, paddingTop: insets.top }]}>
       {/* Header */}
       <View style={styles.header}>
-        <Pressable style={({ pressed }) => [styles.backBtn, pressed && { opacity: 0.7 }]} onPress={() => router.back()}>
-          <Ionicons name="chevron-back" size={22} color="#1A1A1A" />
+        <Pressable style={({ pressed }) => [styles.backBtn, { backgroundColor: theme.colors.card }, pressed && { opacity: 0.7 }]} onPress={() => router.back()}>
+          <Ionicons name="chevron-back" size={22} color={theme.colors.text} />
         </Pressable>
-        <Text style={styles.headerTitle}>Thêm thú cưng</Text>
+        <Text style={[styles.headerTitle, { color: theme.colors.text }]}>Thêm thú cưng</Text>
         <Pressable>
-          <Text style={styles.draftBtn}>Lưu bản nháp</Text>
+          <Text style={[styles.draftBtn, { color: theme.colors.primary }]}>Lưu bản nháp</Text>
         </Pressable>
       </View>
 
       {/* Step indicator */}
       <View style={styles.stepIndicator}>
         <View>
-          <Text style={styles.stepTag}>Bước {step} / {STEPS.length}</Text>
-          <Text style={styles.stepTitle}>{STEPS[step - 1].title}</Text>
-          <Text style={styles.stepSub}>{STEPS[step - 1].subtitle}</Text>
+          <Text style={[styles.stepTag, { color: theme.colors.primary }]}>Bước {step} / {STEPS.length}</Text>
+          <Text style={[styles.stepTitle, { color: theme.colors.text }]}>{STEPS[step - 1].title}</Text>
+          <Text style={[styles.stepSub, { color: theme.colors.muted }]}>{STEPS[step - 1].subtitle}</Text>
         </View>
         <View style={styles.stepDots}>
           {STEPS.map((s) => (
@@ -347,8 +358,9 @@ export default function AddPetScreen() {
               key={s.step}
               style={[
                 styles.stepDot,
+                { backgroundColor: theme.colors.border },
                 { width: s.step === step ? 32 : 7 },
-                s.step <= step && styles.stepDotActive,
+                s.step <= step && { backgroundColor: theme.colors.primary },
               ]}
             />
           ))}
@@ -397,7 +409,7 @@ export default function AddPetScreen() {
           </Pressable>
         )}
         <Pressable
-          style={({ pressed }) => [styles.nextBtn, pressed && { opacity: 0.85 }]}
+          style={({ pressed }) => [styles.nextBtn, { backgroundColor: theme.colors.primary, shadowColor: theme.colors.primary }, pressed && { opacity: 0.85 }]}
           onPress={handleNext}
         >
           <Text style={styles.nextBtnText}>
@@ -406,6 +418,7 @@ export default function AddPetScreen() {
         </Pressable>
       </View>
     </View>
+    </KeyboardAvoidingView>
   );
 }
 

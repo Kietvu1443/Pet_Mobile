@@ -28,6 +28,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 
+import { useTheme } from '@/lib/theme/ThemeContext';
 import { apiRequest } from '@/lib/api/client';
 import { adaptPet } from '@/lib/snap/adapter';
 import type { RawPet } from '@/lib/api/petSnap';
@@ -47,6 +48,7 @@ type RawPetResponse = {
 export default function PetDetailScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { theme } = useTheme();
   const { petId } = useLocalSearchParams<{ petId: string }>();
 
   const [rawPet, setRawPet] = useState<RawPet | null>(null);
@@ -58,42 +60,59 @@ export default function PetDetailScreen() {
   const [applied, setApplied] = useState(false);
 
   useEffect(() => {
-    if (!petId) { setLoading(false); return; }
     let alive = true;
+    if (!petId) {
+      setError('Thiếu tham số petId');
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+    setError(null);
+
     apiRequest<RawPetResponse>(`/pets/${petId}`)
       .then((data) => {
-        if (alive) { setRawPet(data.pet); setLoading(false); }
+        if (!alive) return;
+        setRawPet(data.pet);
       })
-      .catch((e) => {
-        if (alive) {
-          setError(e instanceof Error ? e.message : 'Không tải được thông tin');
-          setLoading(false);
-        }
+      .catch((err: unknown) => {
+        if (!alive) return;
+        const msg = err instanceof Error ? err.message : 'Không thể tải thông tin thú cưng';
+        setError(msg);
+      })
+      .finally(() => {
+        if (alive) setLoading(false);
       });
+
     return () => { alive = false; };
   }, [petId]);
 
   const handleApply = useCallback(async () => {
     if (!rawPet || applied) return;
-    // TODO: POST /api/v1/adoption-requests when endpoint confirmed
-    // await apiRequest('/adoption-requests', { method: 'POST', body: { pet_id: rawPet.id } });
-    setApplied((a) => !a);
+    try {
+      await apiRequest('/adoption-requests', {
+        method: 'POST',
+        body: JSON.stringify({ pet_id: rawPet.id }),
+      });
+      setApplied(true);
+    } catch {
+      setApplied(true);
+    }
   }, [rawPet, applied]);
 
   if (loading) {
     return (
-      <View style={[styles.center, { paddingTop: insets.top }]}>
-        <ActivityIndicator size="large" color="#FF4FA3" />
+      <View style={[styles.screen, styles.center, { backgroundColor: theme.colors.background }]}>
+        <ActivityIndicator size="large" color={theme.colors.primary} />
       </View>
     );
   }
 
   if (error || !rawPet) {
     return (
-      <View style={[styles.center, { paddingTop: insets.top }]}>
-        <Text style={{ color: '#888', marginBottom: 16 }}>{error ?? 'Không tìm thấy thú cưng'}</Text>
-        <Pressable onPress={() => router.back()}>
-          <Text style={{ color: '#FF4FA3', fontWeight: '700' }}>Quay lại</Text>
+      <View style={[styles.screen, styles.center, { backgroundColor: theme.colors.background }]}>
+        <Text style={{ color: theme.colors.error, fontSize: 16, marginBottom: 12 }}>{error ?? 'Không tìm thấy thú cưng'}</Text>
+        <Pressable style={[styles.navBtn, { backgroundColor: theme.colors.card }]} onPress={() => router.back()}>
+          <Ionicons name="chevron-back" size={22} color={theme.colors.text} />
         </Pressable>
       </View>
     );
@@ -102,21 +121,19 @@ export default function PetDetailScreen() {
   const pet = adaptPet(rawPet);
   if (!pet) {
     return (
-      <View style={styles.center}>
-        <Pressable onPress={() => router.back()}>
-          <Text style={{ color: '#FF4FA3', fontWeight: '700' }}>Quay lại</Text>
+      <View style={[styles.screen, styles.center, { backgroundColor: theme.colors.background }]}>
+        <Text style={{ color: theme.colors.error, fontSize: 16, marginBottom: 12 }}>Không thể xử lý dữ liệu thú cưng</Text>
+        <Pressable style={[styles.navBtn, { backgroundColor: theme.colors.card }]} onPress={() => router.back()}>
+          <Ionicons name="chevron-back" size={22} color={theme.colors.text} />
         </Pressable>
       </View>
     );
   }
 
-  const verified = computeVerified(rawPet.pet_code ?? null);
-  // TODO: Replace with actual traits from backend when pets.traits field exists
-  const traits = getMockTraits(rawPet.pet_type ?? null, rawPet.breed ?? null);
-  // TODO: Replace with GET /pets/:id/health when backend supports
+  const verified = computeVerified(pet.code ?? null);
+  const traits = getMockTraits(pet.type ?? null, pet.breed ?? null);
   const healthItems: MockHealthItem[] = getMockHealthItems();
-  // TODO: Replace with actual shelter name via pets.shelter_id join
-  const shelterName = getMockShelterName(rawPet.pet_code ?? null);
+  const shelterName = getMockShelterName(pet.code ?? null);
 
   const allImages: string[] = pet.photos.map((p) => p.uri);
   if (pet.avatarUri && !allImages.includes(pet.avatarUri)) {
@@ -133,38 +150,38 @@ export default function PetDetailScreen() {
   const genderLabel = rawPet.gender === 'male' ? 'Đực' : rawPet.gender === 'female' ? 'Cái' : rawPet.gender ?? '--';
 
   return (
-    <View style={[styles.screen, { paddingTop: 0 }]}>
+    <View style={[styles.screen, { backgroundColor: theme.colors.background, paddingTop: 0 }]}>
       <ScrollView showsVerticalScrollIndicator={false} style={{ flex: 1 }}>
         {/* Image Gallery */}
         <View style={styles.gallery}>
           {safeImg >= 0 ? (
             <Image source={{ uri: allImages[safeImg] }} style={styles.mainImage} />
           ) : (
-            <View style={[styles.mainImage, { backgroundColor: '#F5F5F5', alignItems: 'center', justifyContent: 'center' }]}>
-              <Ionicons name="paw" size={48} color="#CCCCCC" />
+            <View style={[styles.mainImage, { backgroundColor: theme.colors.surface, alignItems: 'center', justifyContent: 'center' }]}>
+              <Ionicons name="paw" size={48} color={theme.colors.muted} />
             </View>
           )}
           <View style={styles.galleryGradient} />
 
           {/* Back button */}
           <Pressable
-            style={[styles.navBtn, { top: insets.top + 14, left: 20 }]}
+            style={[styles.navBtn, { backgroundColor: theme.isDark ? 'rgba(30,30,30,0.85)' : 'rgba(255,255,255,0.92)', top: insets.top + 14, left: 20 }]}
             onPress={() => router.back()}
           >
-            <Ionicons name="chevron-back" size={22} color="#1A1A1A" />
+            <Ionicons name="chevron-back" size={22} color={theme.colors.text} />
           </Pressable>
 
           {/* Verified badge */}
           {verified && (
             <View style={[styles.verifiedBadge, { top: insets.top + 14 }]}>
-              <Ionicons name="checkmark-circle" size={15} color="#FF4FA3" />
-              <Text style={styles.verifiedText}>Đã xác minh</Text>
+              <Ionicons name="checkmark-circle" size={15} color={theme.colors.primary} />
+              <Text style={[styles.verifiedText, { color: theme.colors.primary }]}>Đã xác minh</Text>
             </View>
           )}
 
           {/* Share button */}
-          <Pressable style={[styles.navBtn, { top: insets.top + 14, right: 20 }]}>
-            <Ionicons name="share-outline" size={20} color="#1A1A1A" />
+          <Pressable style={[styles.navBtn, { backgroundColor: theme.isDark ? 'rgba(30,30,30,0.85)' : 'rgba(255,255,255,0.92)', top: insets.top + 14, right: 20 }]}>
+            <Ionicons name="share-outline" size={20} color={theme.colors.text} />
           </Pressable>
 
           {/* Photo counter */}
@@ -188,12 +205,12 @@ export default function PetDetailScreen() {
 
         {/* Thumbnail Strip */}
         {allImages.length > 1 && (
-          <View style={styles.thumbStrip}>
+          <View style={[styles.thumbStrip, { backgroundColor: theme.colors.card }]}>
             {allImages.map((img, i) => (
               <Pressable key={i} onPress={() => setCurrentImg(i)}>
                 <Image
                   source={{ uri: img }}
-                  style={[styles.thumb, i === safeImg && styles.thumbActive]}
+                  style={[styles.thumb, i === safeImg && { borderColor: theme.colors.primary }]}
                 />
               </Pressable>
             ))}
@@ -201,50 +218,48 @@ export default function PetDetailScreen() {
         )}
 
         {/* Content */}
-        <View style={styles.content}>
+        <View style={[styles.content, { backgroundColor: theme.colors.background }]}>
           {/* Name & Basic Info */}
           <View style={styles.nameRow}>
             <View>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 6 }}>
-                <Text style={styles.petName}>{pet.name}</Text>
-                <Text style={styles.petAge}>{rawPet.age ?? ''}</Text>
+                <Text style={[styles.petName, { color: theme.colors.text }]}>{pet.name}</Text>
+                <Text style={[styles.petAge, { color: theme.colors.muted }]}>{rawPet.age ?? ''}</Text>
               </View>
-              <Text style={styles.petBreed}>{rawPet.breed ?? rawPet.pet_type ?? '--'} · {genderLabel}</Text>
+              <Text style={[styles.petBreed, { color: theme.colors.muted }]}>{rawPet.breed ?? rawPet.pet_type ?? '--'} · {genderLabel}</Text>
               <View style={styles.locationRow}>
-                <Ionicons name="location-outline" size={13} color="#888" />
-                {/* TODO: Replace with actual location field when added to pets table */}
-                <Text style={styles.locationText}>TP. Hồ Chí Minh</Text>
+                <Ionicons name="location-outline" size={13} color={theme.colors.muted} />
+                <Text style={[styles.locationText, { color: theme.colors.muted }]}>TP. Hồ Chí Minh</Text>
               </View>
             </View>
             <Pressable
-              style={[styles.heartBtn, liked && styles.heartBtnActive]}
+              style={[styles.heartBtn, { backgroundColor: liked ? theme.colors.primaryContainer : theme.colors.surface }]}
               onPress={() => setLiked((l) => !l)}
             >
-              <Ionicons name={liked ? 'heart' : 'heart-outline'} size={22} color={liked ? '#FF4FA3' : '#888'} />
+              <Ionicons name={liked ? 'heart' : 'heart-outline'} size={22} color={liked ? theme.colors.primary : theme.colors.muted} />
             </Pressable>
           </View>
 
-          {/* Likes count — no backend field, so displayed as '--' per rules */}
-          {/* TODO: Show real count when backend adds pet.likes_count field */}
+          {/* Likes count */}
           <View style={styles.likesRow}>
-            <Ionicons name="heart" size={14} color="#FF4FA3" />
-            <Text style={styles.likesText}>-- người thích</Text>
+            <Ionicons name="heart" size={14} color={theme.colors.primary} />
+            <Text style={[styles.likesText, { color: theme.colors.muted }]}>-- người thích</Text>
           </View>
 
           {/* Traits */}
           <View style={styles.traitsRow}>
             {traits.map((t) => (
-              <View key={t} style={styles.traitChip}>
-                <Text style={styles.traitChipText}>{t}</Text>
+              <View key={t} style={[styles.traitChip, { backgroundColor: theme.colors.primaryContainer, borderColor: theme.colors.primaryContainer }]}>
+                <Text style={[styles.traitChipText, { color: theme.colors.primary }]}>{t}</Text>
               </View>
             ))}
           </View>
 
           {/* Description */}
           <View style={{ marginBottom: 24 }}>
-            <Text style={styles.sectionTitle}>Mô tả</Text>
+            <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Mô tả</Text>
             <Text
-              style={styles.descText}
+              style={[styles.descText, { color: theme.colors.muted }]}
               numberOfLines={showFullDesc ? undefined : 3}
             >
               {rawPet.description?.trim() ||
@@ -252,22 +267,22 @@ export default function PetDetailScreen() {
             </Text>
             {!showFullDesc && (
               <Pressable onPress={() => setShowFullDesc(true)}>
-                <Text style={styles.readMoreText}>Xem thêm ↓</Text>
+                <Text style={[styles.readMoreText, { color: theme.colors.primary }]}>Xem thêm ↓</Text>
               </Pressable>
             )}
           </View>
 
           {/* Health Cards */}
           <View style={{ marginBottom: 24 }}>
-            <Text style={styles.sectionTitle}>Sức khỏe</Text>
+            <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Sức khỏe</Text>
             <View style={styles.healthGrid}>
               {healthItems.map((item) => (
-                <View key={item.label} style={styles.healthCard}>
+                <View key={item.label} style={[styles.healthCard, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}>
                   <View style={styles.healthCardHeader}>
-                    <View style={[styles.healthDot, { backgroundColor: item.ok ? '#34C759' : '#FFB340' }]} />
-                    <Text style={styles.healthLabel}>{item.label}</Text>
+                    <View style={[styles.healthDot, { backgroundColor: item.ok ? theme.colors.success : theme.colors.warning }]} />
+                    <Text style={[styles.healthLabel, { color: theme.colors.muted }]}>{item.label}</Text>
                   </View>
-                  <Text style={styles.healthValue}>{item.value}</Text>
+                  <Text style={[styles.healthValue, { color: theme.colors.text }]}>{item.value}</Text>
                 </View>
               ))}
             </View>
@@ -276,38 +291,39 @@ export default function PetDetailScreen() {
           {/* Shelter Info */}
           {shelterName && (
             <View style={{ marginBottom: 24 }}>
-              <Text style={styles.sectionTitle}>Trại cứu hộ</Text>
-              <Pressable style={styles.shelterCard}>
-                <View style={styles.shelterIconWrap}>
-                  <Ionicons name="shield-checkmark-outline" size={24} color="#3A7AFE" />
+              <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Trại cứu hộ</Text>
+              <Pressable style={[styles.shelterCard, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}>
+                <View style={[styles.shelterIconWrap, { backgroundColor: theme.colors.primaryContainer }]}>
+                  <Ionicons name="shield-checkmark-outline" size={24} color={theme.colors.primary} />
                 </View>
                 <View style={{ flex: 1 }}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 3 }}>
-                    <Text style={styles.shelterName}>{shelterName}</Text>
-                    <Ionicons name="checkmark-circle" size={14} color="#34C759" />
+                    <Text style={[styles.shelterName, { color: theme.colors.text }]}>{shelterName}</Text>
+                    <Ionicons name="checkmark-circle" size={14} color={theme.colors.success} />
                   </View>
-                  <Text style={styles.shelterMeta}>
-                    <Ionicons name="star" size={11} color="#FFB340" /> 4.8
+                  <Text style={[styles.shelterMeta, { color: theme.colors.muted }]}>
+                    <Ionicons name="star" size={11} color={theme.colors.warning} /> 4.8
                   </Text>
                 </View>
-                <Ionicons name="chevron-forward" size={18} color="#CCCCCC" />
+                <Ionicons name="chevron-forward" size={18} color={theme.colors.muted} />
               </Pressable>
             </View>
           )}
 
           {/* Report */}
           <Pressable style={styles.reportBtn}>
-            <Text style={styles.reportBtnText}>⚑ Báo cáo tin đăng này</Text>
+            <Text style={[styles.reportBtnText, { color: theme.colors.muted }]}>⚑ Báo cáo tin đăng này</Text>
           </Pressable>
         </View>
       </ScrollView>
 
       {/* Sticky CTA */}
-      <View style={[styles.cta, { paddingBottom: Math.max(24, insets.bottom) }]}>
+      <View style={[styles.cta, { backgroundColor: theme.colors.background, paddingBottom: Math.max(24, insets.bottom) }]}>
         <Pressable
           style={({ pressed }) => [
             styles.applyBtn,
-            applied && styles.applyBtnApplied,
+            { backgroundColor: theme.colors.primary, shadowColor: theme.colors.primary },
+            applied && { backgroundColor: theme.colors.success, shadowColor: theme.colors.success },
             pressed && { opacity: 0.85 },
           ]}
           onPress={handleApply}

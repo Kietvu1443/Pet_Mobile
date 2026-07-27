@@ -1,0 +1,16 @@
+export default {
+  title: 'Saved',
+  petCount: '{{count}} bé',
+  likedCount: 'Đã thích',
+  superlikedCount: 'Siêu thích',
+  passedCount: 'Bỏ qua',
+  filterAll: 'Đã lưu',
+  filterLiked: 'Đã thích',
+  filterSuperliked: 'Siêu thích',
+  badgeLiked: '♥ Thích',
+  badgeSuperliked: '★ Siêu thích',
+  badgePassed: '× Đã bỏ qua',
+  detailBtn: 'Chi tiết',
+  emptyTitle: 'Chưa có bé nào',
+  emptyDesc: 'Những bé bạn yêu thích hoặc quan tâm sẽ xuất hiện ở đây.',
+};

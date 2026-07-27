@@ -1,0 +1,16 @@
+export default {
+  title: 'Saved',
+  petCount: '{{count}} pets',
+  likedCount: 'Liked',
+  superlikedCount: 'Superliked',
+  passedCount: 'Passed',
+  filterAll: 'Saved',
+  filterLiked: 'Liked',
+  filterSuperliked: 'Superliked',
+  badgeLiked: '♥ Liked',
+  badgeSuperliked: '★ Superliked',
+  badgePassed: '× Passed',
+  detailBtn: 'Details',
+  emptyTitle: 'No saved pets yet',
+  emptyDesc: 'Pets you like or show interest in will appear here.',
+};

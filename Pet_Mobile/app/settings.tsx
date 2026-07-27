@@ -14,32 +14,34 @@ import { Ionicons } from '@expo/vector-icons';
 
 import { apiRequest } from '@/lib/api/client';
 import { useAuth } from '@/lib/auth/AuthContext';
-import { setLanguage, type Language, type Theme } from '@/lib/storage/settingsStore';
+import { useTheme } from '@/lib/theme/ThemeContext';
+import { useTranslation } from 'react-i18next';
+import { setLanguage, type Language, ACCENT_COLORS, type AccentColorKey, type ThemeMode } from '@/lib/storage/settingsStore';
 import { notifyThemeChange } from '@/hooks/use-color-scheme';
 
-const LANGUAGES: { id: Language; label: string }[] = [
-  { id: 'vi', label: 'Tiếng Việt' },
-  { id: 'en', label: 'English' },
-];
-
-const THEMES: { id: Theme; label: string }[] = [
-  { id: 'light', label: 'Sáng' },
-  { id: 'dark', label: 'Tối' },
-  { id: 'system', label: 'Theo hệ thống' },
+const LANGUAGES: { id: Language; label: Record<string, string> }[] = [
+  { id: 'vi', label: { vi: 'Tiếng Việt', en: 'Vietnamese' } },
+  { id: 'en', label: { vi: 'Tiếng Anh', en: 'English' } },
 ];
 
 function PillOption({ label, selected, onSelect }: {
   label: string; selected: boolean; onSelect: () => void;
 }) {
+  const { theme } = useTheme();
   return (
     <Pressable
       style={({ pressed }) => [
-        styles.pillOption, selected && styles.pillOptionSelected,
+        styles.pillOption,
+        { backgroundColor: theme.colors.surface, borderColor: theme.colors.border },
+        selected && { backgroundColor: theme.colors.selectedContainer, borderColor: theme.colors.primary, borderWidth: 2 },
         pressed && { opacity: 0.85 },
       ]}
       onPress={onSelect}
     >
-      <Text style={[styles.pillLabel, selected && styles.pillLabelSelected]}>{label}</Text>
+      <Text style={[
+        styles.pillLabel, { color: theme.colors.text },
+        selected && { color: theme.colors.primary, fontWeight: '700' as const },
+      ]}>{label}</Text>
     </Pressable>
   );
 }
@@ -48,9 +50,12 @@ export default function SettingsScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { user, refreshUser } = useAuth();
+  const { themeMode, accentColor, setThemeMode, setAccentColor: setThemeAccent } = useTheme();
+  const { theme } = useTheme();
+  const { t, i18n } = useTranslation(['settings', 'common']);
 
   const [language, setLanguageState] = useState<Language>('vi');
-  const [theme, setThemeState] = useState<Theme>('system');
+
   const [pushEnabled, setPushEnabled] = useState(user?.preferences?.pushEnabled !== false);
   const [emailEnabled, setEmailEnabled] = useState(user?.preferences?.emailEnabled !== false);
 
@@ -63,11 +68,16 @@ export default function SettingsScreen() {
   const handleLanguageChange = async (lang: Language) => {
     setLanguageState(lang);
     await setLanguage(lang);
+    i18n.changeLanguage(lang);
   };
 
-  const handleThemeChange = async (th: Theme) => {
-    setThemeState(th);
-    await notifyThemeChange(th);
+  const handleThemeModeChange = async (mode: ThemeMode) => {
+    await setThemeMode(mode);
+    await notifyThemeChange(mode);
+  };
+
+  const handleAccentColorChange = async (colorKey: AccentColorKey) => {
+    await setThemeAccent(colorKey);
   };
 
   const handleToggleNotification = async (key: 'pushEnabled' | 'emailEnabled', value: boolean) => {
@@ -88,7 +98,7 @@ export default function SettingsScreen() {
   };
 
   return (
-    <Animated.View style={[styles.screen, { paddingTop: insets.top }]}>
+    <Animated.View style={[styles.screen, { backgroundColor: theme.colors.background, paddingTop: insets.top }]}>
       <ScrollView
         style={styles.scroll}
         contentContainerStyle={styles.scrollContent}
@@ -96,50 +106,78 @@ export default function SettingsScreen() {
       >
         <View style={styles.header}>
           <Pressable
-            style={({ pressed }) => [styles.backBtn, pressed && { opacity: 0.7 }]}
+            style={({ pressed }) => [styles.backBtn, { backgroundColor: theme.colors.card }, pressed && { opacity: 0.7 }]}
             onPress={() => router.back()}
           >
-            <Ionicons name="chevron-back" size={20} color="#1A1A1A" />
+            <Ionicons name="chevron-back" size={20} color={theme.colors.text} />
           </Pressable>
-          <Text style={styles.headerTitle}>Cài đặt</Text>
+          <Text style={[styles.headerTitle, { color: theme.colors.text }]}>{t('settings:title')}</Text>
         </View>
 
         {/* Language */}
-        <Text style={styles.sectionLabel}>Ngôn ngữ</Text>
+        <Text style={[styles.sectionLabel, { color: theme.colors.muted }]}>{t('settings:language')}</Text>
         <View style={styles.pillRow}>
           {LANGUAGES.map(l => (
-            <PillOption key={l.id} label={l.label} selected={language === l.id} onSelect={() => handleLanguageChange(l.id)} />
+            <PillOption key={l.id} label={l.label[i18n.language] || l.label.vi} selected={language === l.id} onSelect={() => handleLanguageChange(l.id)} />
           ))}
         </View>
 
-        {/* Theme */}
-        <Text style={styles.sectionLabel}>Giao diện</Text>
+        {/* Theme Mode */}
+        <Text style={[styles.sectionLabel, { color: theme.colors.muted }]}>{t('settings:theme')}</Text>
         <View style={styles.pillRow}>
-          {THEMES.map(t => (
-            <PillOption key={t.id} label={t.label} selected={theme === t.id} onSelect={() => handleThemeChange(t.id)} />
+          {(['light', 'dark', 'system'] as ThemeMode[]).map(m => {
+            const labelMap: Record<ThemeMode, string> = {
+              light: t('settings:light'),
+              dark: t('settings:dark'),
+              system: t('settings:system'),
+            };
+            return (
+              <PillOption key={m} label={labelMap[m]} selected={themeMode === m} onSelect={() => handleThemeModeChange(m)} />
+            );
+          })}
+        </View>
+
+        {/* Accent Color */}
+        <Text style={[styles.sectionLabel, { color: theme.colors.muted }]}>{t('settings:accentColor')}</Text>
+        <View style={styles.accentRow}>
+          {(Object.keys(ACCENT_COLORS) as AccentColorKey[]).map(key => (
+            <Pressable
+              key={key}
+              style={({ pressed }) => [
+                styles.accentCircle,
+                { backgroundColor: ACCENT_COLORS[key] },
+                accentColor === key && styles.accentCircleSelected,
+                pressed && { opacity: 0.8 },
+              ]}
+              onPress={() => handleAccentColorChange(key)}
+            >
+              {accentColor === key && (
+                <Ionicons name="checkmark" size={18} color="white" />
+              )}
+            </Pressable>
           ))}
         </View>
 
         {/* Notifications */}
-        <Text style={styles.sectionLabel}>Thông báo</Text>
-        <View style={styles.toggleGroup}>
+        <Text style={[styles.sectionLabel, { color: theme.colors.muted }]}>{t('settings:notifications')}</Text>
+        <View style={[styles.toggleGroup, { backgroundColor: theme.colors.card }]}>
           <Pressable
             style={({ pressed }) => [styles.toggleRow, pressed && { opacity: 0.7 }]}
             onPress={() => handleToggleNotification('pushEnabled', !pushEnabled)}
           >
-            <Ionicons name="notifications-outline" size={20} color="#1A1A1A" />
-            <Text style={styles.toggleLabel}>Thông báo đẩy</Text>
+            <Ionicons name="notifications-outline" size={20} color={theme.colors.text} />
+            <Text style={[styles.toggleLabel, { color: theme.colors.text }]}>{t('settings:push')}</Text>
             <View style={[styles.toggleSwitch, pushEnabled && styles.toggleSwitchOn]}>
               <View style={[styles.toggleThumb, pushEnabled && styles.toggleThumbOn]} />
             </View>
           </Pressable>
-          <View style={styles.toggleDivider} />
+          <View style={[styles.toggleDivider, { backgroundColor: theme.colors.border }]} />
           <Pressable
             style={({ pressed }) => [styles.toggleRow, pressed && { opacity: 0.7 }]}
             onPress={() => handleToggleNotification('emailEnabled', !emailEnabled)}
           >
-            <Ionicons name="mail-outline" size={20} color="#1A1A1A" />
-            <Text style={styles.toggleLabel}>Email thông báo</Text>
+            <Ionicons name="mail-outline" size={20} color={theme.colors.text} />
+            <Text style={[styles.toggleLabel, { color: theme.colors.text }]}>{t('settings:email')}</Text>
             <View style={[styles.toggleSwitch, emailEnabled && styles.toggleSwitchOn]}>
               <View style={[styles.toggleThumb, emailEnabled && styles.toggleThumbOn]} />
             </View>
@@ -151,31 +189,28 @@ export default function SettingsScreen() {
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: '#F5F5F8' },
+  screen: { flex: 1 },
   scroll: { flex: 1 },
   scrollContent: { paddingHorizontal: 20, paddingTop: 0, paddingBottom: 40 },
   header: { flexDirection: 'row', alignItems: 'center', gap: 14, marginBottom: 24, paddingTop: 16 },
   backBtn: {
     width: 40, height: 40, borderRadius: 20,
-    backgroundColor: 'white', alignItems: 'center', justifyContent: 'center',
+    alignItems: 'center', justifyContent: 'center',
     shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.08, shadowRadius: 10, elevation: 3,
   },
-  headerTitle: { fontSize: 26, fontWeight: '800', color: '#1A1A1A' },
+  headerTitle: { fontSize: 26, fontWeight: '800' },
   sectionLabel: {
-    fontSize: 11, fontWeight: '800', color: '#AAAAAA',
+    fontSize: 11, fontWeight: '800',
     letterSpacing: 1.5, textTransform: 'uppercase', marginBottom: 12,
   },
   pillRow: { flexDirection: 'row', gap: 10, flexWrap: 'wrap', marginBottom: 28 },
   pillOption: {
-    backgroundColor: 'white', borderWidth: 1.5, borderColor: '#E5E7EB',
-    borderRadius: 14, paddingVertical: 11, paddingHorizontal: 18, alignItems: 'center',
+    borderWidth: 1.5, borderRadius: 14, paddingVertical: 11, paddingHorizontal: 18, alignItems: 'center',
   },
-  pillOptionSelected: { backgroundColor: '#FFF0F7', borderColor: '#FF4FA3', borderWidth: 2 },
-  pillLabel: { fontSize: 13, fontWeight: '600', color: '#1A1A1A' },
-  pillLabelSelected: { fontWeight: '700', color: '#FF4FA3' },
+  pillLabel: { fontSize: 13, fontWeight: '600' },
   toggleGroup: {
-    backgroundColor: 'white', borderRadius: 20, overflow: 'hidden',
+    borderRadius: 20, overflow: 'hidden',
     shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.06, shadowRadius: 8, elevation: 3,
   },
@@ -183,7 +218,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', gap: 14,
     paddingVertical: 16, paddingHorizontal: 18,
   },
-  toggleLabel: { flex: 1, fontSize: 15, fontWeight: '600', color: '#1A1A1A' },
+  toggleLabel: { flex: 1, fontSize: 15, fontWeight: '600' },
   toggleSwitch: {
     width: 44, height: 26, borderRadius: 13,
     backgroundColor: '#E5E7EB', padding: 2,
@@ -195,5 +230,19 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.15, shadowRadius: 2, elevation: 2,
   },
   toggleThumbOn: { alignSelf: 'flex-end' },
-  toggleDivider: { height: 1, backgroundColor: '#F5F5F5', marginLeft: 52 },
+  toggleDivider: { height: 1, marginLeft: 52 },
+  accentRow: {
+    flexDirection: 'row', gap: 16, marginBottom: 28, justifyContent: 'center',
+  },
+  accentCircle: {
+    width: 44, height: 44, borderRadius: 22,
+    alignItems: 'center', justifyContent: 'center',
+    shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15, shadowRadius: 6, elevation: 4,
+  },
+  accentCircleSelected: {
+    width: 50, height: 50, borderRadius: 25,
+    borderWidth: 3, borderColor: 'white',
+    shadowOpacity: 0.3, shadowRadius: 10, elevation: 8,
+  },
 });

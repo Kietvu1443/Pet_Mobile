@@ -23,6 +23,7 @@ import { Circle, Ellipse, Path, Svg } from "react-native-svg";
 
 import { ApiError } from "@/lib/api/client";
 import { useAuth } from "@/lib/auth/AuthContext";
+import { useTheme } from "@/lib/theme/ThemeContext";
 import type { RegisterData } from "@/lib/api/auth";
 
 // ─── Nhân vật cún hoạt họa SVG ───────────────────────────────────────────────
@@ -117,34 +118,36 @@ function InputPill({
   onChangeText: (t: string) => void;
   secureTextEntry?: boolean;
   editable?: boolean;
-  keyboardType?: "default" | "email-address";
+  keyboardType?: "default" | "email-address" | "phone-pad";
   autoCapitalize?: "none" | "sentences" | "words" | "characters";
   returnKeyType?: "go" | "done" | "next";
   onSubmitEditing?: () => void;
   rightElement?: React.ReactNode;
 }) {
+  const { theme } = useTheme();
   const [focused, setFocused] = useState(false);
 
   return (
     <View
       style={[
         styles.inputPill,
-        focused && styles.inputPillFocused,
-        !editable && styles.inputPillDisabled,
+        { backgroundColor: theme.colors.card, borderColor: theme.colors.border },
+        focused && { borderColor: theme.colors.primary, borderWidth: 2 },
+        !editable && { opacity: 0.6 },
       ]}
     >
       <Ionicons
         name={iconName}
         size={20}
-        color={focused ? "#83541D" : "#837468"}
+        color={focused ? theme.colors.primary : theme.colors.muted}
         style={styles.inputIcon}
       />
       <TextInput
-        style={styles.inputText}
+        style={[styles.inputText, { color: theme.colors.text }]}
         value={value}
         onChangeText={onChangeText}
         placeholder={placeholder}
-        placeholderTextColor="rgba(131,116,104,0.5)"
+        placeholderTextColor={theme.colors.muted}
         secureTextEntry={secureTextEntry}
         editable={editable}
         keyboardType={keyboardType}
@@ -162,39 +165,45 @@ function InputPill({
 
 // ─── Màn hình chính ──────────────────────────────────────────────────────────
 export default function RegisterScreen() {
+  const { theme } = useTheme();
   const { register } = useAuth();
   const router = useRouter();
 
   const [displayName, setDisplayName] = useState("");
   const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const [showConfirm, setShowConfirm] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
 
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  const PHONE_REGEX = /^0[35789][0-9]{8}$/;
 
-  const isValidEmail = emailRegex.test(email.trim());
+  function normalizePhone(raw: string): string {
+    return raw.replace(/\s+|-/g, "").replace(/^\+84/, "0");
+  }
+
+  const normalizedPhone = normalizePhone(phone);
+  const isValidPhone = PHONE_REGEX.test(normalizedPhone);
 
   const isFormEmpty =
     displayName.trim().length === 0 ||
     name.trim().length === 0 ||
-    email.trim().length === 0 ||
+    phone.trim().length === 0 ||
     password.length === 0 ||
     confirmPassword.length === 0;
 
-  const canSubmit = !isFormEmpty && !submitting;
+  const canSubmit = isValidPhone && !submitting && !isFormEmpty;
 
   async function handleSubmit() {
     if (!canSubmit) return;
 
     setError("");
 
-    if (!isValidEmail) {
-      setError("Email không đúng định dạng (VD: example@gmail.com)");
+    if (!isValidPhone) {
+      setError("Số điện thoại không đúng định dạng (VD: 0912345678)");
       return;
     }
 
@@ -213,14 +222,13 @@ export default function RegisterScreen() {
     const data: RegisterData = {
       display_name: displayName.trim(),
       name: name.trim(),
-      email: email.trim().toLowerCase(),
+      phone: normalizedPhone,
       password,
       confirmPassword,
     };
 
     try {
       await register(data);
-      // Route gate tự chuyển về (tabs) sau khi user được set.
     } catch (e) {
       const message =
         e instanceof ApiError
@@ -234,33 +242,36 @@ export default function RegisterScreen() {
 
   return (
     <KeyboardAvoidingView
-      style={styles.flex}
+      style={[styles.flex, { backgroundColor: theme.colors.background }]}
       behavior={Platform.OS === "ios" ? "padding" : undefined}
     >
       <ScrollView
         contentContainerStyle={styles.scroll}
         keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="interactive"
         showsVerticalScrollIndicator={false}
       >
         {/* ── Khu vực minh họa ── */}
         <View style={styles.illustrationWrapper}>
           <SpeechBubble />
-          <View style={styles.dogCircle}>
+          <View style={[styles.dogCircle, { borderColor: theme.colors.border }]}>
             <DogCharacter />
           </View>
         </View>
 
         {/* ── Tiêu đề ── */}
         <View style={styles.headerText}>
-          <Text style={styles.title}>Đăng ký</Text>
-          <Text style={styles.subtitle}>Tham gia cộng đồng yêu thú cưng!</Text>
+          <Text style={[styles.title, { color: theme.colors.text }]}>Tạo tài khoản</Text>
+          <Text style={[styles.subtitle, { color: theme.colors.muted }]}>
+            Đăng ký để đồng hành cùng các bé thú cưng!
+          </Text>
         </View>
 
         {/* ── Form ── */}
         <View style={styles.form}>
           <InputPill
-            iconName="at-outline"
-            placeholder="Tên đăng nhập"
+            iconName="person-outline"
+            placeholder="Tên đăng nhập *"
             value={displayName}
             onChangeText={setDisplayName}
             editable={!submitting}
@@ -268,28 +279,27 @@ export default function RegisterScreen() {
           />
 
           <InputPill
-            iconName="person-outline"
-            placeholder="Họ và tên"
+            iconName="card-outline"
+            placeholder="Họ và tên *"
             value={name}
             onChangeText={setName}
             editable={!submitting}
-            autoCapitalize="words"
             returnKeyType="next"
           />
 
           <InputPill
-            iconName="mail-outline"
-            placeholder="Địa chỉ email"
-            value={email}
-            onChangeText={setEmail}
+            iconName="call-outline"
+            placeholder="Số điện thoại *"
+            value={phone}
+            onChangeText={setPhone}
+            keyboardType="phone-pad"
             editable={!submitting}
-            keyboardType="email-address"
             returnKeyType="next"
           />
 
           <InputPill
             iconName="lock-closed-outline"
-            placeholder="Mật khẩu (tối thiểu 8 ký tự)"
+            placeholder="Mật khẩu (tối thiểu 8 ký tự) *"
             value={password}
             onChangeText={setPassword}
             secureTextEntry={!showPassword}
@@ -304,7 +314,7 @@ export default function RegisterScreen() {
                 <Ionicons
                   name={showPassword ? "eye-off-outline" : "eye-outline"}
                   size={20}
-                  color="#837468"
+                  color={theme.colors.muted}
                 />
               </Pressable>
             }
@@ -312,54 +322,65 @@ export default function RegisterScreen() {
 
           <InputPill
             iconName="shield-checkmark-outline"
-            placeholder="Xác nhận mật khẩu"
+            placeholder="Xác nhận mật khẩu *"
             value={confirmPassword}
             onChangeText={setConfirmPassword}
-            secureTextEntry={!showConfirm}
+            secureTextEntry={!showConfirmPassword}
             editable={!submitting}
-            returnKeyType="go"
+            returnKeyType="done"
             onSubmitEditing={handleSubmit}
             rightElement={
               <Pressable
-                onPress={() => setShowConfirm((v) => !v)}
+                onPress={() => setShowConfirmPassword((v) => !v)}
                 hitSlop={8}
                 style={styles.eyeBtn}
               >
                 <Ionicons
-                  name={showConfirm ? "eye-off-outline" : "eye-outline"}
+                  name={showConfirmPassword ? "eye-off-outline" : "eye-outline"}
                   size={20}
-                  color="#837468"
+                  color={theme.colors.muted}
                 />
               </Pressable>
             }
           />
 
           {/* Thông báo lỗi */}
-          {error ? <Text style={styles.errorText}>{error}</Text> : null}
+          {error.length > 0 && (
+            <View style={[styles.errorBox, { backgroundColor: theme.colors.errorContainer, borderColor: theme.colors.error }]}>
+              <Ionicons name="alert-circle-outline" size={18} color={theme.colors.error} />
+              <Text style={[styles.errorText, { color: theme.colors.error }]}>{error}</Text>
+            </View>
+          )}
 
-          {/* Nút Đăng ký */}
+          {/* Nút đăng ký */}
           <TouchableOpacity
-            style={[
-              styles.registerBtn,
-              !canSubmit && styles.registerBtnDisabled,
-            ]}
+            activeOpacity={0.85}
             onPress={handleSubmit}
             disabled={!canSubmit}
-            activeOpacity={0.85}
+            style={styles.btnWrapper}
           >
-            {submitting ? (
-              <ActivityIndicator color="#241912" />
-            ) : (
-              <Text style={styles.registerBtnText}>Đăng ký</Text>
-            )}
+            <View
+              style={[
+                styles.registerBtn,
+                canSubmit
+                  ? { backgroundColor: theme.colors.primary, shadowColor: theme.colors.primary }
+                  : { backgroundColor: theme.colors.disabled, shadowOpacity: 0 },
+              ]}
+            >
+              {submitting ? (
+                <ActivityIndicator color="white" />
+              ) : (
+                <Text style={styles.registerBtnText}>Đăng ký</Text>
+              )}
+            </View>
           </TouchableOpacity>
         </View>
 
         {/* ── Footer ── */}
         <View style={styles.footer}>
-          <Text style={styles.footerText}>Đã có tài khoản? </Text>
-          <TouchableOpacity onPress={() => router.back()}>
-            <Text style={styles.footerLink}>Đăng nhập</Text>
+          <Text style={[styles.footerText, { color: theme.colors.muted }]}>Đã có tài khoản? </Text>
+          <TouchableOpacity onPress={() => router.push("/(auth)/login")}>
+            <Text style={[styles.footerLink, { color: theme.colors.primary }]}>Đăng nhập</Text>
           </TouchableOpacity>
         </View>
       </ScrollView>
@@ -509,6 +530,16 @@ const styles = StyleSheet.create({
     padding: 2,
   },
   // Error
+  errorBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    borderWidth: 1.5,
+    borderRadius: 16,
+    padding: 12,
+    marginTop: 4,
+  },
   errorText: {
     fontFamily: "Fredoka_400Regular",
     fontSize: 14,
@@ -517,13 +548,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
   },
   // Register button
+  btnWrapper: {
+    width: '100%',
+    marginTop: 4,
+  },
   registerBtn: {
-    backgroundColor: ACCENT,
     borderRadius: 50,
     paddingVertical: 15,
     alignItems: "center",
-    marginTop: 4,
-    shadowColor: PRIMARY,
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.2,
     shadowRadius: 10,

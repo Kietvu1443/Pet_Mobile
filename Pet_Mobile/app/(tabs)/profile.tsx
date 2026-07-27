@@ -26,11 +26,13 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 
+import { useTheme } from '@/lib/theme/ThemeContext';
 import { useAuth } from '@/lib/auth/AuthContext';
 import { apiRequest } from '@/lib/api/client';
 import { calculateProfileCompletion } from '@/lib/profile/profileCompletion';
 import { resolveImageUrl } from '@/lib/images/resolveUrl';
 import { getCurrentRoleLabel, getQuickRoleFromPreferences } from '@/lib/profile/userRole';
+import { useTranslation } from 'react-i18next';
 
 // Adoption request count from backend
 type AdoptionRequestsResponse = { requests: { status?: string }[]; total?: number };
@@ -66,6 +68,7 @@ export default function ProfileScreen() {
   const { user, logout, refreshUser } = useAuth();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { t } = useTranslation(['profile', 'common', 'auth']);
 
   const [adoptionCount, setAdoptionCount] = useState(0);
   const [matchCount, setMatchCount] = useState(0);
@@ -129,11 +132,9 @@ export default function ProfileScreen() {
     ]);
   }, [isLoggingOut, logout]);
 
-  const stats = [
-    { count: scanCount, label: 'Đã quét', sublabel: 'tổng', color: '#1A1A1A' },
-    { count: matchCount, label: 'Match', sublabel: matchCount === 0 ? 'chưa có' : 'lần', color: '#FF4FA3' },
-    { count: adoptionCount, label: 'Nhận nuôi', sublabel: adoptionCount === 0 ? 'chưa có' : 'đơn', color: '#34C759' },
-  ];
+  const { theme } = useTheme();
+  const avatarUri = user?.avatar ? resolveImageUrl(user.avatar) : null;
+  const completion = calculateProfileCompletion(user);
 
   const menuSections: MenuSection[] = [
     {
@@ -143,16 +144,16 @@ export default function ProfileScreen() {
           icon: 'person-outline',
           iconBg: '#FFF0F7',
           iconColor: '#FF4FA3',
-          label: 'Thông tin cá nhân',
-          sublabel: 'Tên, email, ngày sinh',
+          label: t('profile:personalInfo'),
+          sublabel: t('profile:personalInfoSub'),
           onPress: () => router.push('/personal-info' as Parameters<typeof router.push>[0]),
         },
         {
           icon: 'paw-outline',
           iconBg: '#FFF0F7',
           iconColor: '#FF4FA3',
-          label: 'Vai trò',
-          sublabel: 'Đổi vai trò bất cứ lúc ...',
+          label: t('profile:role'),
+          sublabel: t('profile:roleSub'),
           badge: getCurrentRoleLabel(user?.role, getQuickRoleFromPreferences(user?.preferences)),
           onPress: () => router.push('/role' as Parameters<typeof router.push>[0]),
         },
@@ -160,44 +161,47 @@ export default function ProfileScreen() {
           icon: 'home-outline',
           iconBg: '#E8F8EE',
           iconColor: '#34C759',
-          label: 'Đánh giá nhà ở',
-          sublabel: activeReview?.status === 'rejected' ? 'Cần cập nhật thông tin' : 'Cập nhật để tăng tỉ lệ duyệt',
-          badge: activeReview?.status === 'pending' ? 'Chờ duyệt' : activeReview?.status === 'approved' ? 'Đã duyệt' : activeReview?.status === 'rejected' ? 'Cần sửa' : null,
+          label: t('profile:housingReview'),
+          sublabel: activeReview?.status === 'rejected' ? t('profile:updateForApproval') : t('profile:housingReviewSub'),
+          badge: activeReview?.status === 'pending' ? t('profile:pending') : activeReview?.status === 'approved' ? t('profile:approved') : activeReview?.status === 'rejected' ? t('profile:needsUpdate') : null,
           onPress: () => router.push('/housing-review' as Parameters<typeof router.push>[0]),
         },
         {
           icon: 'alert-circle-outline',
           iconBg: '#FFF8E8',
           iconColor: '#FFB340',
-          label: 'Thú cưng bị thất lạc',
-          sublabel: 'Xem và đăng báo lạc',
+          label: t('profile:lostPets'),
+          sublabel: t('profile:lostPetsSub'),
           onPress: () => router.push('/lost-pets' as Parameters<typeof router.push>[0]),
         },
         {
           icon: 'settings-outline',
           iconBg: '#F0F0FF',
           iconColor: '#8B5CF6',
-          label: 'Cài đặt',
-          sublabel: 'Ngôn ngữ, thông báo, bảo mật',
+          label: t('profile:settings'),
+          sublabel: t('profile:settingsSub'),
           onPress: () => router.push('/settings' as Parameters<typeof router.push>[0]),
         },
         {
           icon: 'document-text-outline',
           iconBg: '#E8F8EE',
           iconColor: '#34C759',
-          label: 'Thông tin & Pháp lý',
-          sublabel: 'Điều khoản & chính sách bảo mật',
+          label: t('profile:legal'),
+          sublabel: t('profile:legalSub'),
           onPress: () => router.push('/legal-info' as Parameters<typeof router.push>[0]),
         },
       ],
     },
   ];
 
-  const avatarUri = user?.avatar ? resolveImageUrl(user.avatar) : null;
-  const completion = calculateProfileCompletion(user);
+  const stats = [
+    { count: scanCount, label: t('profile:scanCount'), sublabel: t('profile:noData'), color: '#1A1A1A' },
+    { count: matchCount, label: t('profile:matchCount'), sublabel: matchCount === 0 ? t('profile:noData') : '', color: '#FF4FA3' },
+    { count: adoptionCount, label: t('profile:adoptionCount'), sublabel: adoptionCount === 0 ? t('profile:noData') : '', color: '#34C759' },
+  ];
 
   return (
-    <View style={styles.screen}>
+    <View style={[styles.screen, { backgroundColor: theme.colors.background }]}>
       <ScrollView
         contentContainerStyle={[
           styles.content,
@@ -210,10 +214,10 @@ export default function ProfileScreen() {
         }
       >
       {/* Title */}
-      <Text style={styles.pageTitle}>Hồ sơ</Text>
+      <Text style={[styles.pageTitle, { color: theme.colors.text }]}>Hồ sơ</Text>
 
       {/* Profile Hero Card */}
-      <View style={styles.heroCard}>
+      <View style={[styles.heroCard, { backgroundColor: theme.colors.primary, shadowColor: theme.colors.primary }]}>
         {/* Decorative blobs */}
         <View style={styles.blobTop} />
         <View style={styles.blobBottom} />
@@ -232,7 +236,7 @@ export default function ProfileScreen() {
               </View>
             )}
             <View style={styles.editBadge}>
-              <Ionicons name="pencil" size={10} color="#FF4FA3" />
+              <Ionicons name="pencil" size={10} color={theme.colors.primary} />
             </View>
           </View>
 
@@ -255,25 +259,25 @@ export default function ProfileScreen() {
       {/* Stats Row */}
       <View style={styles.statsRow}>
         {stats.map((s) => (
-          <View key={s.label} style={styles.statCard}>
+          <View key={s.label} style={[styles.statCard, { backgroundColor: theme.colors.card, borderColor: theme.colors.border, borderWidth: 1 }]}>
             <Text style={[styles.statCount, { color: s.color }]}>{s.count}</Text>
-            <Text style={styles.statLabel}>{s.label}</Text>
-            <Text style={styles.statSublabel}>{s.sublabel}</Text>
+            <Text style={[styles.statLabel, { color: theme.colors.text }]}>{s.label}</Text>
+            <Text style={[styles.statSublabel, { color: theme.colors.muted }]}>{s.sublabel}</Text>
           </View>
         ))}
       </View>
 
       {/* Rejected Housing Review callout */}
       {activeReview?.status === 'rejected' && (
-        <View style={styles.alertCard}>
+        <View style={[styles.alertCard, { backgroundColor: theme.colors.errorContainer, borderColor: theme.colors.error }]}>
           <View style={{ flexDirection: 'row', gap: 10, alignItems: 'center', marginBottom: 6 }}>
-            <Ionicons name="home-outline" size={20} color="#FF4D4F" />
-            <Text style={styles.alertTitle}>Đánh giá nhà ở cần cập nhật</Text>
+            <Ionicons name="home-outline" size={20} color={theme.colors.error} />
+            <Text style={[styles.alertTitle, { color: theme.colors.text }]}>Đánh giá nhà ở cần cập nhật</Text>
           </View>
-          <Text style={styles.alertText}>
+          <Text style={[styles.alertText, { color: theme.colors.muted }]}>
             Quản trị viên đã phản hồi về hồ sơ của bạn. Vui lòng cập nhật ngay để tiếp tục nhận nuôi.
           </Text>
-          <Pressable style={styles.alertBtn} onPress={() => router.push('/housing-review')}>
+          <Pressable style={[styles.alertBtn, { backgroundColor: theme.colors.error }]} onPress={() => router.push('/housing-review')}>
             <Text style={styles.alertBtnText}>Cập nhật ngay</Text>
             <Ionicons name="arrow-forward" size={14} color="white" />
           </Pressable>
@@ -283,29 +287,29 @@ export default function ProfileScreen() {
       {/* Menu Sections */}
       {menuSections.map((section) => (
         <View key={section.title}>
-          <Text style={styles.sectionTitle}>{section.title}</Text>
-          <View style={styles.menuCard}>
+          <Text style={[styles.sectionTitle, { color: theme.colors.muted }]}>{section.title}</Text>
+          <View style={[styles.menuCard, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}>
             {section.items.map((item, i) => (
               <View key={item.label}>
                 <Pressable
                   style={({ pressed }) => [styles.menuItem, pressed && { opacity: 0.7 }]}
                   onPress={item.onPress}
                 >
-                  <View style={[styles.menuIconBox, { backgroundColor: item.iconBg }]}>
+                  <View style={[styles.menuIconBox, { backgroundColor: theme.isDark ? theme.colors.surface : item.iconBg }]}>
                     <Ionicons name={item.icon} size={20} color={item.iconColor} />
                   </View>
                   <View style={styles.menuText}>
-                    <Text style={styles.menuLabel}>{item.label}</Text>
-                    <Text style={styles.menuSublabel} numberOfLines={1}>{item.sublabel}</Text>
+                    <Text style={[styles.menuLabel, { color: theme.colors.text }]}>{item.label}</Text>
+                    <Text style={[styles.menuSublabel, { color: theme.colors.muted }]} numberOfLines={1}>{item.sublabel}</Text>
                   </View>
                   {item.badge && (
-                    <View style={styles.menuBadge}>
+                    <View style={[styles.menuBadge, { backgroundColor: theme.colors.primary }]}>
                       <Text style={styles.menuBadgeText}>{item.badge}</Text>
                     </View>
                   )}
-                  <Ionicons name="chevron-forward" size={16} color="#CCCCCC" />
+                  <Ionicons name="chevron-forward" size={16} color={theme.colors.muted} />
                 </Pressable>
-                {i < section.items.length - 1 && <View style={styles.menuDivider} />}
+                {i < section.items.length - 1 && <View style={[styles.menuDivider, { backgroundColor: theme.colors.border }]} />}
               </View>
             ))}
           </View>
@@ -314,21 +318,21 @@ export default function ProfileScreen() {
 
       {/* Logout Button */}
       <Pressable
-        style={({ pressed }) => [styles.logoutBtn, pressed && { opacity: 0.7 }]}
+        style={({ pressed }) => [styles.logoutBtn, { backgroundColor: theme.colors.card }, pressed && { opacity: 0.7 }]}
         onPress={handleLogout}
       >
-        <Ionicons name="log-out-outline" size={18} color="#FF4D4F" />
-        <Text style={styles.logoutText}>Đăng xuất</Text>
+        <Ionicons name="log-out-outline" size={18} color={theme.colors.error} />
+        <Text style={[styles.logoutText, { color: theme.colors.error }]}>Đăng xuất</Text>
       </Pressable>
 
       {/* App version */}
-      <Text style={styles.versionText}>Pet Match · Version 1.2.0</Text>
+      <Text style={[styles.versionText, { color: theme.colors.muted }]}>Pet Match · Version 1.2.0</Text>
     </ScrollView>
 
       {isLoggingOut && (
-        <View style={styles.loadingOverlay}>
-          <ActivityIndicator size="large" color="#FF4FA3" />
-          <Text style={styles.loadingText}>Đang đăng xuất…</Text>
+        <View style={[styles.loadingOverlay, { backgroundColor: theme.isDark ? 'rgba(18,18,18,0.85)' : 'rgba(255,255,255,0.85)' }]}>
+          <ActivityIndicator size="large" color={theme.colors.primary} />
+          <Text style={[styles.loadingText, { color: theme.colors.text }]}>Đang đăng xuất…</Text>
         </View>
       )}
     </View>

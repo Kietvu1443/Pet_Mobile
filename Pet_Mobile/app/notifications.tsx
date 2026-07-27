@@ -17,6 +17,7 @@ import { apiRequest } from '@/lib/api/client';
 import { updateGlobalUnread, useUnreadNotifications } from '@/lib/notifications/unread';
 import { navigateFromNotification } from '@/lib/notifications/device';
 import { NotificationData, NotificationItem } from '@/components/NotificationItem';
+import { useTheme } from '@/lib/theme/ThemeContext';
 
 // In-memory 30s cache variables
 let cacheData: NotificationData[] = [];
@@ -28,6 +29,7 @@ type FlatListItem =
   | { type: 'item'; id: string; data: NotificationData };
 
 export default function NotificationCenterScreen() {
+  const { theme } = useTheme();
   const router = useRouter();
   const pathname = usePathname();
   const insets = useSafeAreaInsets();
@@ -219,8 +221,8 @@ export default function NotificationCenterScreen() {
     ({ item }: { item: FlatListItem }) => {
       if (item.type === 'header') {
         return (
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionHeaderText}>{item.title}</Text>
+          <View style={[styles.sectionHeader, { backgroundColor: theme.colors.background, borderBottomColor: theme.colors.border }]}>
+            <Text style={[styles.sectionHeaderText, { color: theme.colors.muted }]}>{item.title}</Text>
           </View>
         );
       }
@@ -232,25 +234,25 @@ export default function NotificationCenterScreen() {
         />
       );
     },
-    [handleItemPress]
+    [handleItemPress, theme]
   );
 
   // Skeleton / initial loading state
   if (loading && notifications.length === 0) {
     return (
-      <View style={[styles.screen, { paddingTop: insets.top }]}>
+      <View style={[styles.screen, { backgroundColor: theme.colors.background, paddingTop: insets.top }]}>
         <Stack.Screen options={{ headerShown: false }} />
         {/* Custom Header */}
-        <View style={styles.header}>
+        <View style={[styles.header, { backgroundColor: theme.colors.card, borderBottomColor: theme.colors.border }]}>
           <Pressable style={styles.backBtn} onPress={() => router.back()}>
-            <Ionicons name="chevron-back" size={24} color="#1A1A1A" />
+            <Ionicons name="chevron-back" size={24} color={theme.colors.text} />
           </Pressable>
-          <Text style={styles.headerTitle}>Thông báo</Text>
+          <Text style={[styles.headerTitle, { color: theme.colors.text }]}>Thông báo</Text>
           <View style={styles.headerRightPlaceholder} />
         </View>
-        <View style={styles.centeredState}>
-          <ActivityIndicator size="large" color={SNAP_COLORS.like} />
-          <Text style={styles.loadingText}>Đang tải thông báo...</Text>
+        <View style={[styles.centeredState, { backgroundColor: theme.colors.background }]}>
+          <ActivityIndicator size="large" color={theme.colors.primary} />
+          <Text style={[styles.loadingText, { color: theme.colors.muted }]}>Đang tải thông báo...</Text>
         </View>
       </View>
     );
@@ -259,23 +261,23 @@ export default function NotificationCenterScreen() {
   // Error state
   if (error && notifications.length === 0) {
     return (
-      <View style={[styles.screen, { paddingTop: insets.top }]}>
+      <View style={[styles.screen, { backgroundColor: theme.colors.background, paddingTop: insets.top }]}>
         <Stack.Screen options={{ headerShown: false }} />
         {/* Custom Header */}
-        <View style={styles.header}>
+        <View style={[styles.header, { backgroundColor: theme.colors.card, borderBottomColor: theme.colors.border }]}>
           <Pressable style={styles.backBtn} onPress={() => router.back()}>
-            <Ionicons name="chevron-back" size={24} color="#1A1A1A" />
+            <Ionicons name="chevron-back" size={24} color={theme.colors.text} />
           </Pressable>
-          <Text style={styles.headerTitle}>Thông báo</Text>
+          <Text style={[styles.headerTitle, { color: theme.colors.text }]}>Thông báo</Text>
           <View style={styles.headerRightPlaceholder} />
         </View>
-        <View style={styles.centeredState}>
+        <View style={[styles.centeredState, { backgroundColor: theme.colors.background }]}>
           <View style={styles.emojiContainer}>
             <Text style={{ fontSize: 44 }}>😿</Text>
           </View>
-          <Text style={styles.errorTitle}>Lỗi kết nối</Text>
-          <Text style={styles.errorText}>{error}</Text>
-          <Pressable style={styles.retryBtn} onPress={() => loadNotifications(1, false)}>
+          <Text style={[styles.errorTitle, { color: theme.colors.text }]}>Lỗi kết nối</Text>
+          <Text style={[styles.errorText, { color: theme.colors.muted }]}>{error}</Text>
+          <Pressable style={[styles.retryBtn, { backgroundColor: theme.colors.primary }]} onPress={() => loadNotifications(1, false)}>
             <Text style={styles.retryBtnText}>Thử lại</Text>
           </Pressable>
         </View>
@@ -287,25 +289,25 @@ export default function NotificationCenterScreen() {
   const isListEmpty = notifications.length === 0;
 
   return (
-    <View style={[styles.screen, { paddingTop: insets.top }]}>
+    <View style={[styles.screen, { backgroundColor: theme.colors.background, paddingTop: insets.top }]}>
       <Stack.Screen options={{ headerShown: false }} />
 
       {/* Header */}
-      <View style={styles.header}>
+      <View style={[styles.header, { backgroundColor: theme.colors.card, borderBottomColor: theme.colors.border }]}>
         <Pressable
           style={({ pressed }) => [styles.backBtn, pressed && styles.headerPressed]}
           onPress={() => router.back()}
         >
-          <Ionicons name="chevron-back" size={24} color="#1A1A1A" />
+          <Ionicons name="chevron-back" size={24} color={theme.colors.text} />
         </Pressable>
-        <Text style={styles.headerTitle}>Thông báo</Text>
+        <Text style={[styles.headerTitle, { color: theme.colors.text }]}>Thông báo</Text>
         
         {!isListEmpty ? (
           <Pressable
-            style={({ pressed }) => [styles.markReadBtn, pressed && styles.headerPressed]}
+            style={({ pressed }) => [styles.markReadBtn, { backgroundColor: theme.colors.surface }, pressed && styles.headerPressed]}
             onPress={handleMarkAllRead}
           >
-            <Text style={styles.markReadText}>Đọc tất cả</Text>
+            <Text style={[styles.markReadText, { color: theme.colors.primary }]}>Đọc tất cả</Text>
           </Pressable>
         ) : (
           <View style={styles.headerRightPlaceholder} />
@@ -314,34 +316,32 @@ export default function NotificationCenterScreen() {
 
       {/* Notification List or Empty State */}
       {isListEmpty ? (
-        <View style={styles.centeredState}>
-          <View style={styles.emptyIconContainer}>
-            <Ionicons name="notifications-off-outline" size={48} color="#CCCCCC" />
+        <View style={[styles.centeredState, { backgroundColor: theme.colors.background }]}>
+          <View style={[styles.emptyIconContainer, { backgroundColor: theme.colors.card }]}>
+            <Ionicons name="notifications-off-outline" size={48} color={theme.colors.muted} />
           </View>
-          <Text style={styles.emptyTitle}>Bạn chưa có thông báo nào</Text>
-          <Text style={styles.emptyText}>
-            Khi có hoạt động mới, chúng tôi sẽ thông báo tại đây.
+          <Text style={[styles.emptyTitle, { color: theme.colors.text }]}>Chưa có thông báo nào</Text>
+          <Text style={[styles.emptyText, { color: theme.colors.muted }]}>
+            Các cập nhật về nhận nuôi, nhận diện và tài khoản sẽ xuất hiện tại đây.
           </Text>
         </View>
       ) : (
         <FlatList
           data={groupedData}
-          renderItem={renderFlatListItem}
           keyExtractor={(item) => item.id}
+          renderItem={renderFlatListItem}
+          showsVerticalScrollIndicator={false}
           onRefresh={handleRefresh}
           refreshing={refreshing}
           onEndReached={handleLoadMore}
-          onEndReachedThreshold={0.5}
+          onEndReachedThreshold={0.4}
           ListFooterComponent={
             loadingMore ? (
               <View style={styles.listFooter}>
-                <ActivityIndicator size="small" color={SNAP_COLORS.like} />
+                <ActivityIndicator size="small" color={theme.colors.primary} />
               </View>
             ) : null
           }
-          
-          // Performance tuning
-          initialNumToRender={15}
           maxToRenderPerBatch={15}
           windowSize={7}
           removeClippedSubviews={true}

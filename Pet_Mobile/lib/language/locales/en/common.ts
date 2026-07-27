@@ -1,0 +1,18 @@
+export default {
+  appName: 'Pet Helper',
+  addPet: 'Add Pet',
+  save: 'Save Changes',
+  cancel: 'Cancel',
+  back: 'Back',
+  next: 'Continue',
+  loading: 'Loading...',
+  retry: 'Retry',
+  search: 'Search',
+  saved: 'Saved',
+  delete: 'Delete',
+  confirm: 'Confirm',
+  close: 'Close',
+  hello: 'Hello',
+  noData: 'No data',
+  error: 'An error occurred',
+};

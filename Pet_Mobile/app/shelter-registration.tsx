@@ -3,6 +3,8 @@ import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  KeyboardAvoidingView,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -16,6 +18,7 @@ import { Ionicons } from '@expo/vector-icons';
 
 import { apiRequest } from '@/lib/api/client';
 import { useAuth } from '@/lib/auth/AuthContext';
+import { useTheme } from '@/lib/theme/ThemeContext';
 
 type ShelterStatus = 'unsubmitted' | 'pending' | 'approved' | 'rejected';
 
@@ -39,6 +42,7 @@ type ShelterData = {
 export default function ShelterRegistrationScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { theme } = useTheme();
   const { refreshUser } = useAuth();
 
   const [loading, setLoading] = useState(true);
@@ -109,33 +113,38 @@ export default function ShelterRegistrationScreen() {
   }
 
   return (
-    <Animated.View style={[styles.screen, { paddingTop: insets.top }]}>
+    <Animated.View style={[styles.screen, { backgroundColor: theme.colors.background, paddingTop: insets.top }]}>
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      >
       <ScrollView
         style={styles.scroll}
         contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="interactive"
+        showsVerticalScrollIndicator={false}
       >
         {/* Header */}
         <View style={styles.header}>
           <Pressable
-            style={({ pressed }) => [styles.backBtn, pressed && { opacity: 0.7 }]}
+            style={({ pressed }) => [styles.backBtn, { backgroundColor: theme.colors.card }, pressed && { opacity: 0.7 }]}
             onPress={() => router.back()}
           >
-            <Ionicons name="chevron-back" size={20} color="#1A1A1A" />
+            <Ionicons name="chevron-back" size={20} color={theme.colors.text} />
           </Pressable>
-          <Text style={styles.headerTitle}>Đăng ký trại cứu hộ</Text>
+          <Text style={[styles.headerTitle, { color: theme.colors.text }]}>Đăng ký trại cứu hộ</Text>
         </View>
 
         {/* Status banner */}
         {shelterStatus !== 'unsubmitted' && (
-          <View style={[styles.statusBanner, { backgroundColor: statusInfo.bg, borderColor: statusInfo.border, flexDirection: 'column', alignItems: 'flex-start' }]}>
+          <View style={[styles.statusBanner, { backgroundColor: shelterStatus === 'approved' ? theme.colors.successContainer : shelterStatus === 'rejected' ? theme.colors.errorContainer : theme.colors.warningContainer, borderColor: shelterStatus === 'approved' ? theme.colors.success : shelterStatus === 'rejected' ? theme.colors.error : theme.colors.warning, flexDirection: 'column', alignItems: 'flex-start' }]}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-              <Ionicons name={statusInfo.icon} size={18} color={statusInfo.text} />
-              <Text style={[styles.statusText, { color: statusInfo.text }]}>{statusInfo.label}</Text>
+              <Ionicons name={statusInfo.icon} size={18} color={shelterStatus === 'approved' ? theme.colors.success : shelterStatus === 'rejected' ? theme.colors.error : theme.colors.warning} />
+              <Text style={[styles.statusText, { color: shelterStatus === 'approved' ? theme.colors.success : shelterStatus === 'rejected' ? theme.colors.error : theme.colors.warning }]}>{statusInfo.label}</Text>
             </View>
             {adminNotes && (
-              <Text style={[styles.adminNotes, { color: statusInfo.text, marginTop: 6, fontWeight: '500' }]}>
+              <Text style={[styles.adminNotes, { color: shelterStatus === 'approved' ? theme.colors.success : shelterStatus === 'rejected' ? theme.colors.error : theme.colors.warning, marginTop: 6, fontWeight: '500' }]}>
                 Phản hồi: {adminNotes}
               </Text>
             )}
@@ -144,41 +153,41 @@ export default function ShelterRegistrationScreen() {
 
         {!isEditable && (
           <View style={styles.readonlyNotice}>
-            <Ionicons name="lock-closed-outline" size={14} color="#9CA3AF" />
-            <Text style={styles.readonlyNoticeText}>Đơn đã được gửi và không thể chỉnh sửa</Text>
+            <Ionicons name="lock-closed-outline" size={14} color={theme.colors.muted} />
+            <Text style={[styles.readonlyNoticeText, { color: theme.colors.muted }]}>Đơn đã được gửi và không thể chỉnh sửa</Text>
           </View>
         )}
 
-        <Text style={styles.headerDesc}>
+        <Text style={[styles.headerDesc, { color: theme.colors.muted }]}>
           Đăng ký trại cứu hộ để quản lý thú cưng, nhận yêu cầu nhận nuôi và xuất hiện trên bản đồ trại cứu hộ.
         </Text>
 
         {/* Form fields */}
         <View style={styles.fieldWrapper}>
-          <Text style={styles.fieldLabel}>Tên trại</Text>
-          <View style={styles.fieldRow}>
-            <Ionicons name="business-outline" size={16} color="#CCCCCC" />
+          <Text style={[styles.fieldLabel, { color: theme.colors.text }]}>Tên trại</Text>
+          <View style={[styles.fieldRow, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}>
+            <Ionicons name="business-outline" size={16} color={theme.colors.muted} />
             <TextInput
-              style={styles.fieldInput}
+              style={[styles.fieldInput, { color: theme.colors.text }]}
               value={name}
               onChangeText={setName}
               placeholder="Tên trại cứu hộ..."
-              placeholderTextColor="#CCCCCC"
+              placeholderTextColor={theme.colors.muted}
               editable={isEditable}
             />
           </View>
         </View>
 
         <View style={styles.fieldWrapper}>
-          <Text style={styles.fieldLabel}>Số điện thoại</Text>
-          <View style={styles.fieldRow}>
-            <Ionicons name="call-outline" size={16} color="#CCCCCC" />
+          <Text style={[styles.fieldLabel, { color: theme.colors.text }]}>Số điện thoại</Text>
+          <View style={[styles.fieldRow, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}>
+            <Ionicons name="call-outline" size={16} color={theme.colors.muted} />
             <TextInput
-              style={styles.fieldInput}
+              style={[styles.fieldInput, { color: theme.colors.text }]}
               value={phone}
               onChangeText={setPhone}
               placeholder="+84912345678"
-              placeholderTextColor="#CCCCCC"
+              placeholderTextColor={theme.colors.muted}
               keyboardType="phone-pad"
               editable={isEditable}
             />
@@ -186,30 +195,30 @@ export default function ShelterRegistrationScreen() {
         </View>
 
         <View style={styles.fieldWrapper}>
-          <Text style={styles.fieldLabel}>Địa chỉ</Text>
-          <View style={styles.fieldRow}>
-            <Ionicons name="location-outline" size={16} color="#CCCCCC" />
+          <Text style={[styles.fieldLabel, { color: theme.colors.text }]}>Địa chỉ</Text>
+          <View style={[styles.fieldRow, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}>
+            <Ionicons name="location-outline" size={16} color={theme.colors.muted} />
             <TextInput
-              style={styles.fieldInput}
+              style={[styles.fieldInput, { color: theme.colors.text }]}
               value={address}
               onChangeText={setAddress}
               placeholder="Địa chỉ trại..."
-              placeholderTextColor="#CCCCCC"
+              placeholderTextColor={theme.colors.muted}
               editable={isEditable}
             />
           </View>
         </View>
 
         <View style={[styles.fieldWrapper, { marginBottom: 40 }]}>
-          <Text style={styles.fieldLabel}>Mô tả</Text>
-          <View style={[styles.fieldRow, { minHeight: 80, alignItems: 'flex-start', paddingVertical: 12 }]}>
-            <Ionicons name="document-text-outline" size={16} color="#CCCCCC" style={{ marginTop: 2 }} />
+          <Text style={[styles.fieldLabel, { color: theme.colors.text }]}>Mô tả</Text>
+          <View style={[styles.fieldRow, { backgroundColor: theme.colors.card, borderColor: theme.colors.border, minHeight: 80, alignItems: 'flex-start', paddingVertical: 12 }]}>
+            <Ionicons name="document-text-outline" size={16} color={theme.colors.muted} style={{ marginTop: 2 }} />
             <TextInput
-              style={[styles.fieldInput, { minHeight: 60, textAlignVertical: 'top' }]}
+              style={[styles.fieldInput, { color: theme.colors.text, minHeight: 60, textAlignVertical: 'top' }]}
               value={description}
               onChangeText={setDescription}
               placeholder="Mô tả về trại cứu hộ..."
-              placeholderTextColor="#CCCCCC"
+              placeholderTextColor={theme.colors.muted}
               multiline
               numberOfLines={3}
               editable={isEditable}
@@ -219,29 +228,30 @@ export default function ShelterRegistrationScreen() {
 
         <View style={{ height: 100 }} />
       </ScrollView>
+      </KeyboardAvoidingView>
 
       {/* Sticky bottom bar */}
-      <View style={[styles.bottomBar, { paddingBottom: Math.max(20, insets.bottom) }]}>
+      <View style={[styles.bottomBar, { backgroundColor: theme.colors.card, borderTopColor: theme.colors.border, paddingBottom: Math.max(20, insets.bottom) }]}>
         <Pressable
-          style={({ pressed }) => [styles.cancelBtn, pressed && { opacity: 0.7 }]}
+          style={({ pressed }) => [styles.cancelBtn, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }, pressed && { opacity: 0.7 }]}
           onPress={() => router.back()}
         >
-          <Text style={styles.cancelText}>Huỷ</Text>
+          <Text style={[styles.cancelText, { color: theme.colors.text }]}>Huỷ</Text>
         </Pressable>
         {isEditable && (
           <Pressable
             style={({ pressed }) => [
               styles.saveBtn,
-              !canSave && styles.saveBtnDisabled,
+              { backgroundColor: canSave ? theme.colors.primary : theme.colors.disabled, shadowColor: theme.colors.primary },
               pressed && canSave && { opacity: 0.85 },
             ]}
             onPress={handleSave}
             disabled={!canSave || saving}
           >
             {saving ? (
-              <ActivityIndicator size="small" color={canSave ? 'white' : '#9CA3AF'} />
+              <ActivityIndicator size="small" color={canSave ? 'white' : theme.colors.muted} />
             ) : (
-              <Text style={[styles.saveText, !canSave && styles.saveTextDisabled]}>
+              <Text style={[styles.saveText, !canSave && { color: theme.colors.muted }]}>
                 {existingId ? 'Cập nhật' : 'Gửi đăng ký'}
               </Text>
             )}

@@ -3,6 +3,8 @@ import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  KeyboardAvoidingView,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -13,8 +15,10 @@ import Animated from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 
+import { useTheme } from '@/lib/theme/ThemeContext';
 import { apiRequest } from '@/lib/api/client';
 import { useAuth } from '@/lib/auth/AuthContext';
+import { useTranslation } from 'react-i18next';
 
 type HousingType = 'apartment' | 'rental' | 'house' | null;
 type OutdoorSpace = 'none' | 'balcony' | 'garden' | null;
@@ -54,14 +58,15 @@ function SectionHeader({ icon, title, badge, badgeColor }: {
   badge?: string;
   badgeColor?: string;
 }) {
+  const { theme } = useTheme();
   return (
     <View style={styles.sectionHeader}>
-      <View style={styles.sectionIconBox}>
-        <Ionicons name={icon} size={16} color="#FF4FA3" />
+      <View style={[styles.sectionIconBox, { backgroundColor: theme.colors.primaryContainer }]}>
+        <Ionicons name={icon} size={16} color={theme.colors.primary} />
       </View>
-      <Text style={styles.sectionTitle}>{title}</Text>
+      <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>{title}</Text>
       {badge && (
-        <Text style={[styles.sectionBadge, { color: badgeColor || '#9CA3AF' }]}>{badge}</Text>
+        <Text style={[styles.sectionBadge, { color: badgeColor || theme.colors.muted }]}>{badge}</Text>
       )}
     </View>
   );
@@ -75,22 +80,23 @@ function CardOption({ label, sublabel, icon, selected, onSelect, disabled }: {
   onSelect: () => void;
   disabled?: boolean;
 }) {
+  const { theme } = useTheme();
   return (
     <Pressable
       style={({ pressed }) => [
         styles.cardOption,
-        selected && styles.cardOptionSelected,
+        { backgroundColor: selected ? theme.colors.selectedContainer : theme.colors.card, borderColor: selected ? theme.colors.primary : theme.colors.border },
         disabled && { opacity: 0.6 },
         pressed && !disabled && { opacity: 0.85 },
       ]}
       onPress={disabled ? undefined : onSelect}
     >
-      <Ionicons name={icon} size={26} color={selected ? '#FF4FA3' : '#6B7280'} />
-      <Text style={[styles.cardOptionLabel, selected && styles.cardOptionLabelSelected]}>
+      <Ionicons name={icon} size={26} color={selected ? theme.colors.primary : theme.colors.muted} />
+      <Text style={[styles.cardOptionLabel, { color: selected ? theme.colors.primary : theme.colors.text }]}>
         {label}
       </Text>
       {sublabel && (
-        <Text style={[styles.cardOptionSublabel, selected && styles.cardOptionSublabelSelected]}>
+        <Text style={[styles.cardOptionSublabel, { color: selected ? theme.colors.primary : theme.colors.muted }]}>
           {sublabel}
         </Text>
       )}
@@ -106,22 +112,23 @@ function PillOption({ label, sublabel, selected, onSelect, fullWidth, disabled }
   fullWidth?: boolean;
   disabled?: boolean;
 }) {
+  const { theme } = useTheme();
   return (
     <Pressable
       style={({ pressed }) => [
         styles.pillOption,
-        selected && styles.pillOptionSelected,
+        { backgroundColor: selected ? theme.colors.selectedContainer : theme.colors.card, borderColor: selected ? theme.colors.primary : theme.colors.border },
         fullWidth && { flex: 1 },
         disabled && { opacity: 0.6 },
         pressed && !disabled && { opacity: 0.85 },
       ]}
       onPress={disabled ? undefined : onSelect}
     >
-      <Text style={[styles.pillOptionLabel, selected && styles.pillOptionLabelSelected]}>
+      <Text style={[styles.pillOptionLabel, { color: selected ? theme.colors.primary : theme.colors.text }]}>
         {label}
       </Text>
       {sublabel && (
-        <Text style={[styles.pillOptionSublabel, selected && styles.pillOptionSublabelSelected]}>
+        <Text style={[styles.pillOptionSublabel, { color: selected ? theme.colors.primary : theme.colors.muted }]}>
           {sublabel}
         </Text>
       )}
@@ -135,20 +142,21 @@ function CheckboxRow({ label, checked, onToggle, disabled }: {
   onToggle: () => void;
   disabled?: boolean;
 }) {
+  const { theme } = useTheme();
   return (
     <Pressable
       style={({ pressed }) => [
         styles.checkboxRow,
-        checked && styles.checkboxRowSelected,
+        { backgroundColor: checked ? theme.colors.selectedContainer : theme.colors.card, borderColor: checked ? theme.colors.primary : theme.colors.border },
         disabled && { opacity: 0.6 },
         pressed && !disabled && { opacity: 0.85 },
       ]}
       onPress={disabled ? undefined : onToggle}
     >
-      <View style={[styles.checkbox, checked && styles.checkboxChecked]}>
+      <View style={[styles.checkbox, checked ? { backgroundColor: theme.colors.primary, borderWidth: 0 } : { borderColor: theme.colors.border }]}>
         {checked && <Ionicons name="checkmark" size={13} color="white" />}
       </View>
-      <Text style={[styles.checkboxLabel, checked && styles.checkboxLabelSelected]}>
+      <Text style={[styles.checkboxLabel, { color: checked ? theme.colors.primary : theme.colors.text }]}>
         {label}
       </Text>
     </Pressable>
@@ -158,7 +166,16 @@ function CheckboxRow({ label, checked, onToggle, disabled }: {
 export default function HousingReviewScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { theme } = useTheme();
   const { refreshUser } = useAuth();
+  const { t } = useTranslation(['housing', 'common']);
+
+  const statusLabelMap: Record<ReviewStatus, { label: string; bg: string; border: string; text: string; icon: keyof typeof Ionicons.glyphMap }> = {
+    unsubmitted: { label: t('housing:statusUnsubmitted'), bg: '#F5F5F5', border: '#E0E0E0', text: '#888', icon: 'time-outline' },
+    pending: { label: t('housing:statusPending'), bg: '#FFF8E8', border: '#FFD699', text: '#B8860B', icon: 'hourglass-outline' },
+    approved: { label: t('housing:statusApproved'), bg: '#E8F8EE', border: '#A8E6C1', text: '#34C759', icon: 'checkmark-circle-outline' },
+    rejected: { label: t('housing:statusRejected'), bg: '#FFF0F0', border: '#FFC0C0', text: '#FF4D4F', icon: 'close-circle-outline' },
+  };
 
   const [loading, setLoading] = useState(true);
   const [existingId, setExistingId] = useState<number | null>(null);
@@ -240,51 +257,56 @@ export default function HousingReviewScreen() {
 
       await refreshUser();
       router.back();
-    } catch (e) {
-      Alert.alert('Lỗi', e instanceof Error ? e.message : 'Không thể lưu đánh giá');
+    } catch (e: any) {
+      Alert.alert('Lỗi', e.message || 'Không thể lưu đánh giá nhà ở');
     } finally {
       setSaving(false);
     }
   };
 
-  const statusInfo = STATUS_LABEL[reviewStatus];
+  const statusInfo = statusLabelMap[reviewStatus];
 
   if (loading) {
     return (
-      <View style={[styles.screen, { paddingTop: insets.top, alignItems: 'center', justifyContent: 'center' }]}>
-        <ActivityIndicator size="large" color="#FF4FA3" />
+      <View style={[styles.screen, { backgroundColor: theme.colors.background, alignItems: 'center', justifyContent: 'center' }]}>
+        <ActivityIndicator size="large" color={theme.colors.primary} />
       </View>
     );
   }
 
   return (
-    <Animated.View style={[styles.screen, { paddingTop: insets.top }]}>
+    <Animated.View style={[styles.screen, { backgroundColor: theme.colors.background, paddingTop: insets.top }]}>
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      >
       <ScrollView
         style={styles.scroll}
         contentContainerStyle={styles.scrollContent}
+        keyboardDismissMode="interactive"
         showsVerticalScrollIndicator={false}
       >
         {/* Header */}
         <View style={styles.header}>
           <Pressable
-            style={({ pressed }) => [styles.backBtn, pressed && { opacity: 0.7 }]}
+            style={({ pressed }) => [styles.backBtn, { backgroundColor: theme.colors.card }, pressed && { opacity: 0.7 }]}
             onPress={() => router.back()}
           >
-            <Ionicons name="chevron-back" size={20} color="#1A1A1A" />
+            <Ionicons name="chevron-back" size={20} color={theme.colors.text} />
           </Pressable>
-          <Text style={styles.headerTitle}>Đánh giá nhà ở</Text>
+          <Text style={[styles.headerTitle, { color: theme.colors.text }]}>{t('housing:title')}</Text>
         </View>
 
         {/* Review status banner */}
         {reviewStatus !== 'unsubmitted' && (
-          <View style={[styles.statusBanner, { backgroundColor: statusInfo.bg, borderColor: statusInfo.border, flexDirection: 'column', alignItems: 'flex-start' }]}>
+          <View style={[styles.statusBanner, { backgroundColor: reviewStatus === 'approved' ? theme.colors.successContainer : reviewStatus === 'rejected' ? theme.colors.errorContainer : theme.colors.warningContainer, borderColor: reviewStatus === 'approved' ? theme.colors.success : reviewStatus === 'rejected' ? theme.colors.error : theme.colors.warning, flexDirection: 'column', alignItems: 'flex-start' }]}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-              <Ionicons name={statusInfo.icon} size={18} color={statusInfo.text} />
-              <Text style={[styles.statusText, { color: statusInfo.text }]}>{statusInfo.label}</Text>
+              <Ionicons name={statusInfo.icon} size={18} color={reviewStatus === 'approved' ? theme.colors.success : reviewStatus === 'rejected' ? theme.colors.error : theme.colors.warning} />
+              <Text style={[styles.statusText, { color: reviewStatus === 'approved' ? theme.colors.success : reviewStatus === 'rejected' ? theme.colors.error : theme.colors.warning }]}>{statusInfo.label}</Text>
             </View>
             {adminNotes && (
-              <Text style={[styles.adminNotes, { color: statusInfo.text, marginTop: 6, fontWeight: '500' }]}>
-                Phản hồi: {adminNotes}
+              <Text style={[styles.adminNotes, { color: reviewStatus === 'approved' ? theme.colors.success : reviewStatus === 'rejected' ? theme.colors.error : theme.colors.warning, marginTop: 6, fontWeight: '500' }]}>
+                {t('housing:feedbackLabel', { feedback: adminNotes })}
               </Text>
             )}
           </View>
@@ -292,102 +314,102 @@ export default function HousingReviewScreen() {
 
         {!isEditable && (
           <View style={styles.readonlyNotice}>
-            <Ionicons name="lock-closed-outline" size={14} color="#9CA3AF" />
-            <Text style={styles.readonlyNoticeText}>Đánh giá đã được gửi và không thể chỉnh sửa</Text>
+            <Ionicons name="lock-closed-outline" size={14} color={theme.colors.muted} />
+            <Text style={[styles.readonlyNoticeText, { color: theme.colors.muted }]}>Đánh giá đã được gửi và không thể chỉnh sửa</Text>
           </View>
         )}
 
-        <Text style={styles.headerDesc}>
-          Cập nhật để chúng tôi đề xuất các bé phù hợp với không gian và thói quen của bạn, đồng thời tăng tỉ lệ được duyệt nhận nuôi.
+        <Text style={[styles.headerDesc, { color: theme.colors.muted }]}>
+          {t('housing:headerDesc')}
         </Text>
 
         {/* 1. Không gian sống */}
-        <SectionHeader icon="home-outline" title="Không gian sống của bạn" />
+        <SectionHeader icon="home-outline" title={t('housing:livingSpace')} />
         <View style={styles.cardRow}>
-          <CardOption label="Căn hộ" sublabel="Chung cư, tập thể" icon="business-outline" selected={housingType === 'apartment'} onSelect={() => setHousingType('apartment')} disabled={!isEditable} />
-          <CardOption label="Phòng thuê" sublabel="Nhà trọ, ở ghép" icon="home-outline" selected={housingType === 'rental'} onSelect={() => setHousingType('rental')} disabled={!isEditable} />
-          <CardOption label="Nhà riêng" sublabel="Nhà mặt đất" icon="home-outline" selected={housingType === 'house'} onSelect={() => setHousingType('house')} disabled={!isEditable} />
+          <CardOption label={t('housing:apartment')} sublabel={t('housing:apartmentSub')} icon="business-outline" selected={housingType === 'apartment'} onSelect={() => setHousingType('apartment')} disabled={!isEditable} />
+          <CardOption label={t('housing:rental')} sublabel={t('housing:rentalSub')} icon="home-outline" selected={housingType === 'rental'} onSelect={() => setHousingType('rental')} disabled={!isEditable} />
+          <CardOption label={t('housing:house')} sublabel={t('housing:houseSub')} icon="home-outline" selected={housingType === 'house'} onSelect={() => setHousingType('house')} disabled={!isEditable} />
         </View>
 
         {/* 2. Không gian ngoài trời */}
-        <SectionHeader icon="flower-outline" title="Không gian ngoài trời" badge="TUỲ CHỌN" />
+        <SectionHeader icon="flower-outline" title={t('housing:outdoor')} badge={t('housing:optional')} />
         <View style={styles.pillRow}>
-          <PillOption label="Không có" selected={outdoorSpace === 'none'} onSelect={() => setOutdoorSpace('none')} disabled={!isEditable} />
-          <PillOption label="Ban công" selected={outdoorSpace === 'balcony'} onSelect={() => setOutdoorSpace('balcony')} disabled={!isEditable} />
-          <PillOption label="Sân / vườn" selected={outdoorSpace === 'garden'} onSelect={() => setOutdoorSpace('garden')} disabled={!isEditable} />
+          <PillOption label={t('housing:none')} selected={outdoorSpace === 'none'} onSelect={() => setOutdoorSpace('none')} disabled={!isEditable} />
+          <PillOption label={t('housing:balcony')} selected={outdoorSpace === 'balcony'} onSelect={() => setOutdoorSpace('balcony')} disabled={!isEditable} />
+          <PillOption label={t('housing:garden')} selected={outdoorSpace === 'garden'} onSelect={() => setOutdoorSpace('garden')} disabled={!isEditable} />
         </View>
 
         {/* 3. Thú cưng khác */}
-        <SectionHeader icon="paw-outline" title="Bạn đã có thú cưng khác?" />
+        <SectionHeader icon="paw-outline" title={t('housing:hasPets')} />
         <View style={styles.pillRow}>
-          <PillOption label="Có" selected={hasPets === 'yes'} onSelect={() => setHasPets('yes')} fullWidth disabled={!isEditable} />
-          <PillOption label="Không" selected={hasPets === 'no'} onSelect={() => setHasPets('no')} fullWidth disabled={!isEditable} />
+          <PillOption label={t('housing:yes')} selected={hasPets === 'yes'} onSelect={() => setHasPets('yes')} fullWidth disabled={!isEditable} />
+          <PillOption label={t('housing:no')} selected={hasPets === 'no'} onSelect={() => setHasPets('no')} fullWidth disabled={!isEditable} />
         </View>
 
         {/* 4. Trẻ em */}
-        <SectionHeader icon="people-outline" title="Có trẻ em dưới 12 tuổi trong nhà?" />
+        <SectionHeader icon="people-outline" title={t('housing:hasChildren')} />
         <View style={styles.pillRow}>
-          <PillOption label="Có" selected={hasChildren === 'yes'} onSelect={() => setHasChildren('yes')} fullWidth disabled={!isEditable} />
-          <PillOption label="Không" selected={hasChildren === 'no'} onSelect={() => setHasChildren('no')} fullWidth disabled={!isEditable} />
+          <PillOption label={t('housing:yes')} selected={hasChildren === 'yes'} onSelect={() => setHasChildren('yes')} fullWidth disabled={!isEditable} />
+          <PillOption label={t('housing:no')} selected={hasChildren === 'no'} onSelect={() => setHasChildren('no')} fullWidth disabled={!isEditable} />
         </View>
 
         {/* 5. Thời gian ở nhà */}
-        <SectionHeader icon="time-outline" title="Thời gian ở nhà mỗi ngày" badge="TUỲ CHỌN" />
+        <SectionHeader icon="time-outline" title={t('housing:timeAtHome')} badge={t('housing:optional')} />
         <View style={styles.cardRow}>
-          <CardOption label="< 4 giờ" sublabel="Đi làm cả ngày" icon="time-outline" selected={timeAtHome === 'under4'} onSelect={() => setTimeAtHome('under4')} disabled={!isEditable} />
-          <CardOption label="4 – 8 giờ" sublabel="Có ở nhà buổi tối" icon="time-outline" selected={timeAtHome === '4to8'} onSelect={() => setTimeAtHome('4to8')} disabled={!isEditable} />
-          <CardOption label="> 8 giờ" sublabel="Làm việc tại nhà" icon="time-outline" selected={timeAtHome === 'over8'} onSelect={() => setTimeAtHome('over8')} disabled={!isEditable} />
+          <CardOption label={t('housing:under4')} sublabel="" icon="time-outline" selected={timeAtHome === 'under4'} onSelect={() => setTimeAtHome('under4')} disabled={!isEditable} />
+          <CardOption label={t('housing:from4to8')} sublabel="" icon="time-outline" selected={timeAtHome === '4to8'} onSelect={() => setTimeAtHome('4to8')} disabled={!isEditable} />
+          <CardOption label={t('housing:over8')} sublabel="" icon="time-outline" selected={timeAtHome === 'over8'} onSelect={() => setTimeAtHome('over8')} disabled={!isEditable} />
         </View>
 
         {/* 6. Kinh nghiệm */}
-        <SectionHeader icon="ribbon-outline" title="Kinh nghiệm nuôi thú cưng" badge="TUỲ CHỌN" />
+        <SectionHeader icon="ribbon-outline" title={t('housing:experience')} badge={t('housing:optional')} />
         <View style={styles.cardRow}>
-          <CardOption label="Chưa có" sublabel="Lần đầu nuôi" icon="ribbon-outline" selected={experience === 'none'} onSelect={() => setExperience('none')} disabled={!isEditable} />
-          <CardOption label="1 – 2 năm" sublabel="Đã từng nuôi" icon="ribbon-outline" selected={experience === '1to2'} onSelect={() => setExperience('1to2')} disabled={!isEditable} />
-          <CardOption label="Trên 2 năm" sublabel="Nhiều kinh nghiệm" icon="ribbon-outline" selected={experience === 'over2'} onSelect={() => setExperience('over2')} disabled={!isEditable} />
+          <CardOption label={t('housing:expNone')} sublabel="" icon="ribbon-outline" selected={experience === 'none'} onSelect={() => setExperience('none')} disabled={!isEditable} />
+          <CardOption label={t('housing:exp1to2')} sublabel="" icon="ribbon-outline" selected={experience === '1to2'} onSelect={() => setExperience('1to2')} disabled={!isEditable} />
+          <CardOption label={t('housing:expOver2')} sublabel="" icon="ribbon-outline" selected={experience === 'over2'} onSelect={() => setExperience('over2')} disabled={!isEditable} />
         </View>
 
         {/* 7. Thu nhập */}
-        <SectionHeader icon="cash-outline" title="Thu nhập hàng tháng" badge="TUỲ CHỌN" />
+        <SectionHeader icon="cash-outline" title={t('housing:income')} badge={t('housing:optional')} />
         <View style={styles.pillRow}>
-          <PillOption label="< 5 triệu" selected={income === 'u5m'} onSelect={() => setIncome('u5m')} disabled={!isEditable} />
-          <PillOption label="5 – 10 triệu" selected={income === '5-10m'} onSelect={() => setIncome('5-10m')} disabled={!isEditable} />
-          <PillOption label="10 – 20 triệu" selected={income === '10-20m'} onSelect={() => setIncome('10-20m')} disabled={!isEditable} />
-          <PillOption label="> 20 triệu" selected={income === 'o20m'} onSelect={() => setIncome('o20m')} disabled={!isEditable} />
+          <PillOption label={t('housing:under5m')} selected={income === 'u5m'} onSelect={() => setIncome('u5m')} disabled={!isEditable} />
+          <PillOption label={t('housing:from5to10m')} selected={income === '5-10m'} onSelect={() => setIncome('5-10m')} disabled={!isEditable} />
+          <PillOption label={t('housing:from10to20m')} selected={income === '10-20m'} onSelect={() => setIncome('10-20m')} disabled={!isEditable} />
+          <PillOption label={t('housing:over20m')} selected={income === 'o20m'} onSelect={() => setIncome('o20m')} disabled={!isEditable} />
         </View>
 
         {/* 8. Khi đi vắng */}
-        <SectionHeader icon="airplane-outline" title="Khi đi vắng dài ngày, bé sẽ được" badge="TUỲ CHỌN" />
+        <SectionHeader icon="airplane-outline" title={t('housing:whenAway')} badge={t('housing:optional')} />
         <View style={styles.awaySection}>
-          <PillOption label="Gửi người thân / bạn bè" selected={whenAway.includes('family')} onSelect={() => toggleWhenAway('family')} fullWidth disabled={!isEditable} />
+          <PillOption label={t('housing:relatives')} selected={whenAway.includes('family')} onSelect={() => toggleWhenAway('family')} fullWidth disabled={!isEditable} />
           <View style={styles.pillRow}>
-            <PillOption label="Gửi dịch vụ trông giữ" selected={whenAway.includes('service')} onSelect={() => toggleWhenAway('service')} fullWidth disabled={!isEditable} />
-            <PillOption label="Mang bé theo cùng" selected={whenAway.includes('bring')} onSelect={() => toggleWhenAway('bring')} fullWidth disabled={!isEditable} />
+            <PillOption label={t('housing:petHotel')} selected={whenAway.includes('service')} onSelect={() => toggleWhenAway('service')} fullWidth disabled={!isEditable} />
+            <PillOption label={t('housing:bringAlong')} selected={whenAway.includes('bring')} onSelect={() => toggleWhenAway('bring')} fullWidth disabled={!isEditable} />
           </View>
-          <PillOption label="Chưa có kế hoạch" selected={whenAway.includes('noplan')} onSelect={() => toggleWhenAway('noplan')} fullWidth disabled={!isEditable} />
         </View>
 
         {/* 9. Cam kết */}
-        <SectionHeader icon="heart-outline" title="Cam kết của bạn" badge="BẮT BUỘC" badgeColor="#FF4FA3" />
-        <CheckboxRow label="Cam kết không bỏ rơi bé" checked={commitments.includes('no-abandon')} onToggle={() => toggleCommitment('no-abandon')} disabled={!isEditable} />
-        <CheckboxRow label="Cam kết không bán lại bé" checked={commitments.includes('no-resell')} onToggle={() => toggleCommitment('no-resell')} disabled={!isEditable} />
+        <SectionHeader icon="heart-outline" title={t('housing:commitments')} badge="BẮT BUỘC" badgeColor="#FF4FA3" />
+        <CheckboxRow label={t('housing:commitNoAbandon')} checked={commitments.includes('no-abandon')} onToggle={() => toggleCommitment('no-abandon')} disabled={!isEditable} />
+        <CheckboxRow label={t('housing:commitVaccine')} checked={commitments.includes('no-resell')} onToggle={() => toggleCommitment('no-resell')} disabled={!isEditable} />
 
         <View style={{ height: 100 }} />
       </ScrollView>
+      </KeyboardAvoidingView>
 
       {/* Sticky bottom bar */}
-      <View style={[styles.bottomBar, { paddingBottom: Math.max(20, insets.bottom) }]}>
+      <View style={[styles.bottomBar, { backgroundColor: theme.colors.card, borderTopColor: theme.colors.border, paddingBottom: Math.max(20, insets.bottom) }]}>
         <Pressable
-          style={({ pressed }) => [styles.cancelBtn, pressed && { opacity: 0.7 }]}
+          style={({ pressed }) => [styles.cancelBtn, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }, pressed && { opacity: 0.7 }]}
           onPress={() => router.back()}
         >
-          <Text style={styles.cancelText}>Huỷ</Text>
+          <Text style={[styles.cancelText, { color: theme.colors.text }]}>{t('housing:cancelBtn')}</Text>
         </Pressable>
         {isEditable && (
           <Pressable
             style={({ pressed }) => [
               styles.saveBtn,
-              !canSave && styles.saveBtnDisabled,
+              { backgroundColor: canSave ? theme.colors.primary : '#F3F4F6', shadowColor: theme.colors.primary },
               pressed && canSave && { opacity: 0.85 },
             ]}
             onPress={handleSave}
@@ -397,7 +419,7 @@ export default function HousingReviewScreen() {
               <ActivityIndicator size="small" color={canSave ? 'white' : '#9CA3AF'} />
             ) : (
               <Text style={[styles.saveText, !canSave && styles.saveTextDisabled]}>
-                {existingId ? 'Cập nhật' : 'Gửi đánh giá'}
+                {existingId ? t('housing:updateBtn') : t('common:save')}
               </Text>
             )}
           </Pressable>

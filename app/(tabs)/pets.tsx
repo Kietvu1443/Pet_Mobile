@@ -20,6 +20,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 
 import { useUnreadNotifications } from '@/lib/notifications/unread';
+import { useTranslation } from 'react-i18next';
+import { useTheme } from '@/lib/theme/ThemeContext';
 
 import {
   getMockOwnPets,
@@ -28,23 +30,22 @@ import {
   type MockShelter,
 } from '@/adapters/mockAdapter';
 
-// TODO: Replace with real data from GET /api/v1/pets/my
 const OWN_PETS: MockOwnPet[] = getMockOwnPets();
-// TODO: Replace with GET /api/v1/shelters?lat=&lng= API call
 const NEARBY_SHELTERS: MockShelter[] = getMockNearbyShelters();
 
 function EmptyState({ onAdd }: { onAdd: () => void }) {
+  const { theme } = useTheme();
   return (
-    <View style={styles.emptyCard}>
-      <View style={styles.emptyIconWrap}>
-        <Ionicons name="paw" size={38} color="#FF83C4" />
+    <View style={[styles.emptyCard, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}>
+      <View style={[styles.emptyIconWrap, { backgroundColor: theme.colors.primaryContainer }]}>
+        <Ionicons name="paw" size={38} color={theme.colors.primary} />
       </View>
-      <Text style={styles.emptyTag}>Bắt đầu nào</Text>
-      <Text style={styles.emptyTitle}>Chưa có thú cưng nào</Text>
-      <Text style={styles.emptyDesc}>
+      <Text style={[styles.emptyTag, { color: theme.colors.primary }]}>Bắt đầu nào</Text>
+      <Text style={[styles.emptyTitle, { color: theme.colors.text }]}>Chưa có thú cưng nào</Text>
+      <Text style={[styles.emptyDesc, { color: theme.colors.muted }]}>
         Thêm thú cưng của bạn để quản lý thông tin và theo dõi các bé dễ dàng hơn.
       </Text>
-      <Pressable style={({ pressed }) => [styles.addBigBtn, pressed && { opacity: 0.85 }]} onPress={onAdd}>
+      <Pressable style={({ pressed }) => [styles.addBigBtn, { backgroundColor: theme.colors.primary, shadowColor: theme.colors.primary }, pressed && { opacity: 0.85 }]} onPress={onAdd}>
         <Ionicons name="add" size={20} color="white" />
         <Text style={styles.addBigBtnText}>Thêm thú cưng</Text>
       </Pressable>
@@ -53,10 +54,11 @@ function EmptyState({ onAdd }: { onAdd: () => void }) {
 }
 
 function PetCard({ pet }: { pet: MockOwnPet }) {
+  const { theme } = useTheme();
   const [liked, setLiked] = useState(false);
 
   return (
-    <View style={styles.petCard}>
+    <View style={[styles.petCard, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}>
       {/* Image area */}
       <View style={styles.petImageWrap}>
         <Image source={{ uri: pet.image }} style={styles.petImage} />
@@ -65,19 +67,19 @@ function PetCard({ pet }: { pet: MockOwnPet }) {
         {/* Top-right actions */}
         <View style={styles.petTopActions}>
           <Pressable
-            style={styles.petActionBtn}
+            style={[styles.petActionBtn, { backgroundColor: theme.isDark ? 'rgba(30,30,30,0.85)' : 'rgba(255,255,255,0.92)' }]}
             onPress={() => setLiked((l) => !l)}
           >
-            <Ionicons name={liked ? 'heart' : 'heart-outline'} size={18} color={liked ? '#FF4FA3' : '#888'} />
+            <Ionicons name={liked ? 'heart' : 'heart-outline'} size={18} color={liked ? theme.colors.primary : theme.colors.muted} />
           </Pressable>
-          <Pressable style={styles.petActionBtn}>
-            <Ionicons name="camera-outline" size={18} color="#888" />
+          <Pressable style={[styles.petActionBtn, { backgroundColor: theme.isDark ? 'rgba(30,30,30,0.85)' : 'rgba(255,255,255,0.92)' }]}>
+            <Ionicons name="camera-outline" size={18} color={theme.colors.muted} />
           </Pressable>
         </View>
 
         {/* Vaccinated badge */}
         {pet.vaccinated && (
-          <View style={styles.vaccinatedBadge}>
+          <View style={[styles.vaccinatedBadge, { backgroundColor: theme.colors.success }]}>
             <Text style={styles.vaccinatedText}>✓ Đã tiêm phòng</Text>
           </View>
         )}
@@ -96,9 +98,9 @@ function PetCard({ pet }: { pet: MockOwnPet }) {
           { label: 'Cân nặng', value: pet.weight },
           { label: 'Màu lông', value: pet.color },
         ].map((item) => (
-          <View key={item.label} style={styles.petChip}>
-            <Text style={styles.petChipLabel}>{item.label}</Text>
-            <Text style={styles.petChipValue}>{item.value}</Text>
+          <View key={item.label} style={[styles.petChip, { backgroundColor: theme.colors.surface }]}>
+            <Text style={[styles.petChipLabel, { color: theme.colors.muted }]}>{item.label}</Text>
+            <Text style={[styles.petChipValue, { color: theme.colors.text }]}>{item.value}</Text>
           </View>
         ))}
       </View>
@@ -110,11 +112,13 @@ export default function MyPetsScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const hasPets = OWN_PETS.length > 0;
+  const { t } = useTranslation(['tabs', 'common']);
   const { unread } = useUnreadNotifications();
+  const { theme } = useTheme();
 
   return (
     <ScrollView
-      style={styles.screen}
+      style={[styles.screen, { backgroundColor: theme.colors.background }]}
       contentContainerStyle={[
         styles.content,
         { paddingTop: insets.top + 16, paddingBottom: 120 },
@@ -124,26 +128,25 @@ export default function MyPetsScreen() {
       {/* Header */}
       <View style={styles.header}>
         <View>
-          {/* TODO: Replace 'Kikiki' with user.display_name from GET /auth/me */}
-          <Text style={styles.headerTag}>Xin chào, Kikiki 👋</Text>
+          <Text style={[styles.headerTag, { color: theme.colors.primary }]}>Xin chào, Kikiki 👋</Text>
           <View style={styles.headerTitleRow}>
-            <Text style={styles.headerTitle}>Thú cưng</Text>
+            <Text style={[styles.headerTitle, { color: theme.colors.text }]}>{t('tabs:pets')}</Text>
             {hasPets && (
-              <Text style={styles.headerCount}>· {OWN_PETS.length} bé</Text>
+              <Text style={[styles.headerCount, { color: theme.colors.muted }]}>· {OWN_PETS.length} bé</Text>
             )}
           </View>
         </View>
         <View style={styles.headerActions}>
-          <Pressable style={styles.iconBtn} onPress={() => router.push('/notifications')}>
-            <Ionicons name="notifications-outline" size={18} color="#888" />
+          <Pressable style={[styles.iconBtn, { backgroundColor: theme.colors.card }]} onPress={() => router.push('/notifications')}>
+            <Ionicons name="notifications-outline" size={18} color={theme.colors.text} />
             {unread > 0 && (
-              <View style={styles.notifBadge}>
+              <View style={[styles.notifBadge, { backgroundColor: theme.colors.error }]}>
                 <Text style={styles.notifBadgeText}>{unread > 99 ? '99+' : unread}</Text>
               </View>
             )}
           </Pressable>
           <Pressable
-            style={styles.addIconBtn}
+            style={[styles.addIconBtn, { backgroundColor: theme.colors.primary, shadowColor: theme.colors.primary }]}
             onPress={() => router.push('/add-pet' as Parameters<typeof router.push>[0])}
           >
             <Ionicons name="add" size={22} color="white" />
@@ -155,31 +158,29 @@ export default function MyPetsScreen() {
         <EmptyState onAdd={() => router.push('/add-pet' as Parameters<typeof router.push>[0])} />
       ) : (
         <>
-          {/* TODO: Map over GET /api/v1/pets/my results when backend supports */}
           {OWN_PETS.map((pet) => (
             <PetCard key={pet.id} pet={pet} />
           ))}
 
           {/* Add more dashed button */}
           <Pressable
-            style={({ pressed }) => [styles.addMoreBtn, pressed && { opacity: 0.7 }]}
+            style={({ pressed }) => [styles.addMoreBtn, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }, pressed && { opacity: 0.7 }]}
             onPress={() => router.push('/add-pet' as Parameters<typeof router.push>[0])}
           >
-            <View style={styles.addMoreIcon}>
-              <Ionicons name="add" size={18} color="#FF4FA3" />
+            <View style={[styles.addMoreIcon, { backgroundColor: theme.colors.primaryContainer }]}>
+              <Ionicons name="add" size={18} color={theme.colors.primary} />
             </View>
-            <Text style={styles.addMoreText}>Thêm thú cưng mới</Text>
+            <Text style={[styles.addMoreText, { color: theme.colors.primary }]}>Thêm thú cưng mới</Text>
           </Pressable>
         </>
       )}
 
       {/* Nearby Shelters */}
-      {/* TODO: Replace with GET /api/v1/shelters?lat=&lng= */}
       <View style={[styles.sheltersSection, { marginTop: hasPets ? 8 : 32 }]}>
         <View style={styles.sheltersSectionHeader}>
-          <Text style={styles.sheltersSectionTitle}>Trại gần bạn</Text>
+          <Text style={[styles.sheltersSectionTitle, { color: theme.colors.text }]}>Trại gần bạn</Text>
           <Pressable>
-            <Text style={styles.sheltersSeeAll}>Xem tất cả</Text>
+            <Text style={[styles.sheltersSeeAll, { color: theme.colors.primary }]}>Xem tất cả</Text>
           </Pressable>
         </View>
         <ScrollView
@@ -188,7 +189,7 @@ export default function MyPetsScreen() {
           contentContainerStyle={{ gap: 14, paddingBottom: 4 }}
         >
           {NEARBY_SHELTERS.map((s) => (
-            <Pressable key={s.name} style={styles.shelterCard}>
+            <Pressable key={s.name} style={[styles.shelterCard, { backgroundColor: theme.colors.card }]}>
               <View style={styles.shelterImageWrap}>
                 <Image source={{ uri: s.image }} style={styles.shelterImage} />
                 <View style={styles.shelterDistBadge}>
@@ -197,8 +198,8 @@ export default function MyPetsScreen() {
                 </View>
               </View>
               <View style={styles.shelterInfo}>
-                <Text style={styles.shelterName}>{s.name}</Text>
-                <Text style={styles.shelterPets}>{s.pets} bé đang chờ</Text>
+                <Text style={[styles.shelterName, { color: theme.colors.text }]}>{s.name}</Text>
+                <Text style={[styles.shelterPets, { color: theme.colors.muted }]}>{s.pets} bé đang chờ</Text>
               </View>
             </Pressable>
           ))}
@@ -209,7 +210,7 @@ export default function MyPetsScreen() {
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: '#FFF9FC' },
+  screen: { flex: 1 },
   content: { paddingHorizontal: 24 },
   // Header
   header: {
@@ -217,15 +218,15 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between', marginBottom: 24,
   },
   headerTag: {
-    color: '#FF4FA3', fontSize: 11, fontWeight: '800',
+    fontSize: 11, fontWeight: '800',
     letterSpacing: 1.5, textTransform: 'uppercase', marginBottom: 4,
   },
   headerTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  headerTitle: { fontSize: 32, fontWeight: '800', color: '#1A1A1A', lineHeight: 38 },
-  headerCount: { fontSize: 16, color: '#888', marginTop: 4 },
+  headerTitle: { fontSize: 32, fontWeight: '800', lineHeight: 38 },
+  headerCount: { fontSize: 16, marginTop: 4 },
   headerActions: { flexDirection: 'row', gap: 8, marginTop: 4 },
   iconBtn: {
-    width: 44, height: 44, borderRadius: 14, backgroundColor: 'white',
+    width: 44, height: 44, borderRadius: 14,
     alignItems: 'center', justifyContent: 'center',
     shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.08, shadowRadius: 8, elevation: 3,
@@ -234,7 +235,6 @@ const styles = StyleSheet.create({
   notifBadge: {
     position: 'absolute', top: -4, right: -4,
     minWidth: 18, height: 18, borderRadius: 9,
-    backgroundColor: '#FF4D4F',
     alignItems: 'center', justifyContent: 'center',
     paddingHorizontal: 4,
   },
@@ -243,58 +243,56 @@ const styles = StyleSheet.create({
   },
   addIconBtn: {
     width: 44, height: 44, borderRadius: 14,
-    backgroundColor: '#FF4FA3',
     alignItems: 'center', justifyContent: 'center',
-    shadowColor: '#FF4FA3', shadowOffset: { width: 0, height: 4 },
+    shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.40, shadowRadius: 10, elevation: 6,
   },
   // Empty state
   emptyCard: {
-    backgroundColor: 'white', borderRadius: 28, padding: 52,
+    borderRadius: 28, padding: 52,
     alignItems: 'center', textAlign: 'center',
     shadowColor: '#000', shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.06, shadowRadius: 16, elevation: 4,
-    borderWidth: 1.5, borderColor: '#F5E8F0', marginTop: 24,
+    borderWidth: 1.5, marginTop: 24,
   },
   emptyIconWrap: {
     width: 88, height: 88, borderRadius: 44,
-    backgroundColor: '#FFE8F4', alignItems: 'center', justifyContent: 'center',
+    alignItems: 'center', justifyContent: 'center',
     marginBottom: 24,
   },
   emptyTag: {
-    color: '#FF4FA3', fontSize: 11, fontWeight: '800',
+    fontSize: 11, fontWeight: '800',
     letterSpacing: 2, textTransform: 'uppercase', marginBottom: 12,
   },
   emptyTitle: {
-    fontSize: 22, fontWeight: '800', color: '#1A1A1A',
+    fontSize: 22, fontWeight: '800',
     marginBottom: 12, lineHeight: 28,
   },
   emptyDesc: {
-    fontSize: 14, color: '#888', lineHeight: 22, textAlign: 'center',
+    fontSize: 14, lineHeight: 22, textAlign: 'center',
     maxWidth: 260, marginBottom: 32,
   },
   addBigBtn: {
     flexDirection: 'row', alignItems: 'center', gap: 8,
-    backgroundColor: '#FF4FA3', borderRadius: 18,
+    borderRadius: 18,
     paddingHorizontal: 36, paddingVertical: 16,
-    shadowColor: '#FF4FA3', shadowOffset: { width: 0, height: 8 },
+    shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.38, shadowRadius: 16, elevation: 8,
   },
   addBigBtnText: { color: 'white', fontSize: 16, fontWeight: '700' },
   // Pet card
   petCard: {
-    backgroundColor: 'white', borderRadius: 28, overflow: 'hidden',
+    borderRadius: 28, overflow: 'hidden',
     marginBottom: 18,
     shadowColor: '#000', shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.10, shadowRadius: 20, elevation: 8,
-    borderWidth: 1, borderColor: 'rgba(0,0,0,0.04)',
+    borderWidth: 1,
   },
   petImageWrap: { position: 'relative', height: 240 },
   petImage: { width: '100%', height: '100%' },
   petImageGradient: {
     position: 'absolute', bottom: 0, left: 0, right: 0, height: 140,
     backgroundColor: 'transparent',
-    // React Native doesn't support CSS gradient but we overlay a semi-transparent view
   },
   petTopActions: {
     position: 'absolute', top: 16, right: 16,
@@ -302,12 +300,10 @@ const styles = StyleSheet.create({
   },
   petActionBtn: {
     width: 38, height: 38, borderRadius: 19,
-    backgroundColor: 'rgba(255,255,255,0.92)',
     alignItems: 'center', justifyContent: 'center',
   },
   vaccinatedBadge: {
     position: 'absolute', top: 16, left: 16,
-    backgroundColor: 'rgba(52,199,89,0.95)',
     borderRadius: 10, paddingHorizontal: 12, paddingVertical: 4,
   },
   vaccinatedText: { color: 'white', fontSize: 12, fontWeight: '600' },
@@ -318,33 +314,32 @@ const styles = StyleSheet.create({
     flexDirection: 'row', gap: 10, padding: 16,
   },
   petChip: {
-    flex: 1, backgroundColor: '#FFF9FC', borderRadius: 14,
+    flex: 1, borderRadius: 14,
     paddingHorizontal: 12, paddingVertical: 10, alignItems: 'center',
   },
-  petChipLabel: { fontSize: 11, color: '#999', fontWeight: '500', marginBottom: 3 },
-  petChipValue: { fontSize: 14, fontWeight: '700', color: '#1A1A1A' },
+  petChipLabel: { fontSize: 11, fontWeight: '500', marginBottom: 3 },
+  petChipValue: { fontSize: 14, fontWeight: '700' },
   // Add more
   addMoreBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10,
-    backgroundColor: 'white', borderWidth: 2, borderColor: '#FFBBD8',
-    borderStyle: 'dashed', borderRadius: 24, paddingVertical: 20,
+    borderWidth: 2, borderStyle: 'dashed', borderRadius: 24, paddingVertical: 20,
     marginBottom: 12,
   },
   addMoreIcon: {
     width: 36, height: 36, borderRadius: 18,
-    backgroundColor: '#FFF5FA', alignItems: 'center', justifyContent: 'center',
+    alignItems: 'center', justifyContent: 'center',
   },
-  addMoreText: { fontSize: 15, fontWeight: '600', color: '#FF4FA3' },
+  addMoreText: { fontSize: 15, fontWeight: '600' },
   // Shelters
   sheltersSection: { marginBottom: 24 },
   sheltersSectionHeader: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     marginBottom: 14,
   },
-  sheltersSectionTitle: { fontSize: 18, fontWeight: '700', color: '#1A1A1A' },
-  sheltersSeeAll: { fontSize: 14, color: '#FF4FA3', fontWeight: '600' },
+  sheltersSectionTitle: { fontSize: 18, fontWeight: '700' },
+  sheltersSeeAll: { fontSize: 14, fontWeight: '600' },
   shelterCard: {
-    flexShrink: 0, width: 155, backgroundColor: 'white',
+    flexShrink: 0, width: 155,
     borderRadius: 22, overflow: 'hidden',
     shadowColor: '#000', shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.08, shadowRadius: 10, elevation: 4,
@@ -359,6 +354,6 @@ const styles = StyleSheet.create({
   },
   shelterDist: { color: 'white', fontSize: 11, fontWeight: '600' },
   shelterInfo: { padding: 14 },
-  shelterName: { fontSize: 14, fontWeight: '700', color: '#1A1A1A', marginBottom: 3 },
-  shelterPets: { fontSize: 12, color: '#888' },
+  shelterName: { fontSize: 14, fontWeight: '700', marginBottom: 3 },
+  shelterPets: { fontSize: 12 },
 });

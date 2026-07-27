@@ -2,10 +2,6 @@
 //
 // Nguồn dữ liệu:
 //   - lostPets <- GET /api/v1/reports (backend, LIVE)
-//
-// API contract (reportApiV1Controller.js):
-//   GET /reports -> { reports: [ { id, type: 'lost'|'found', description, location,
-//                                   created_at, status, reporter_name, images[] } ] }
 import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import {
@@ -24,8 +20,9 @@ import { Ionicons } from '@expo/vector-icons';
 
 import { apiRequest } from '@/lib/api/client';
 import { resolveImageUrl } from '@/lib/images/resolveUrl';
+import { useTheme } from '@/lib/theme/ThemeContext';
+import { useTranslation } from 'react-i18next';
 
-// Raw shape from GET /api/v1/reports
 type RawReport = {
   id: number;
   type: 'lost' | 'found';
@@ -45,7 +42,6 @@ type ReportsResponse = {
   reports: RawReport[];
 };
 
-// UI model
 type ReportItem = {
   id: number;
   type: 'lost' | 'found';
@@ -91,6 +87,8 @@ type FilterType = 'all' | 'lost' | 'found';
 export default function LostPetsScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { theme } = useTheme();
+  const { t } = useTranslation(['lostPets', 'common']);
 
   const [reports, setReports] = useState<ReportItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -98,13 +96,11 @@ export default function LostPetsScreen() {
   const [filter, setFilter] = useState<FilterType>('all');
   const [refreshing, setRefreshing] = useState(false);
 
-  // Centralised fetch callback — used for both initial mount and pull-to-refresh
   const loadReports = useCallback(async () => {
     const data = await apiRequest<ReportsResponse>('/reports');
     setReports((data.reports ?? []).map(adaptReport));
   }, []);
 
-  // Initial mount: load, then clear loading flag
   useEffect(() => {
     let alive = true;
     loadReports()
@@ -117,7 +113,6 @@ export default function LostPetsScreen() {
     return () => { alive = false; };
   }, [loadReports]);
 
-  // Pull-to-refresh with error alert; preserves existing data on failure
   const handleRefresh = useCallback(async () => {
     setRefreshing(true);
     try {
@@ -138,18 +133,19 @@ export default function LostPetsScreen() {
   });
 
   const FILTER_LABELS: { id: FilterType; label: string }[] = [
-    { id: 'all',   label: 'Tất cả' },
-    { id: 'lost',  label: 'Thất lạc' },
-    { id: 'found', label: 'Đã tìm thấy' },
+    { id: 'all',   label: t('lostPets:filterAll') },
+    { id: 'lost',  label: t('lostPets:filterLost') },
+    { id: 'found', label: t('lostPets:filterFound') },
   ];
 
   return (
     <ScrollView
-      style={styles.screen}
+      style={[styles.screen, { backgroundColor: theme.colors.background }]}
       contentContainerStyle={[
         styles.content,
         { paddingTop: insets.top + 16, paddingBottom: 40 },
       ]}
+      keyboardDismissMode="interactive"
       showsVerticalScrollIndicator={false}
       refreshControl={
         <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
@@ -159,112 +155,118 @@ export default function LostPetsScreen() {
       <View style={styles.header}>
         <View style={styles.headerLeft}>
           <Pressable
-            style={({ pressed }) => [styles.backBtn, pressed && { opacity: 0.7 }]}
+            style={({ pressed }) => [styles.backBtn, { backgroundColor: theme.colors.card }, pressed && { opacity: 0.7 }]}
             onPress={() => router.back()}
           >
-            <Ionicons name="chevron-back" size={22} color="#1A1A1A" />
+            <Ionicons name="chevron-back" size={22} color={theme.colors.text} />
           </Pressable>
           <View>
-            <Text style={styles.headerTag}>Cùng tìm về nhà</Text>
-            <Text style={styles.headerTitle}>Tìm bé bị thất lạc</Text>
+            <Text style={[styles.headerTag, { color: theme.colors.warning }]}>{t('lostPets:headerTag')}</Text>
+            <Text style={[styles.headerTitle, { color: theme.colors.text }]}>{t('lostPets:headerTitle')}</Text>
           </View>
         </View>
         <View style={styles.headerActions}>
-          <Pressable style={styles.iconBtn}>
-            <Ionicons name="search-outline" size={18} color="#888" />
+          <Pressable style={[styles.iconBtn, { backgroundColor: theme.colors.card }]}>
+            <Ionicons name="search-outline" size={18} color={theme.colors.text} />
           </Pressable>
-          <Pressable style={styles.iconBtn}>
-            <Ionicons name="options-outline" size={18} color="#888" />
+          <Pressable style={[styles.iconBtn, { backgroundColor: theme.colors.card }]}>
+            <Ionicons name="options-outline" size={18} color={theme.colors.text} />
           </Pressable>
         </View>
       </View>
 
       {/* Alert Banner */}
-      <View style={styles.alertBanner}>
-        <View style={styles.alertIcon}>
-          <Ionicons name="warning" size={18} color="#FFB340" />
+      <View style={[styles.alertBanner, { backgroundColor: theme.colors.warningContainer, borderColor: theme.colors.warning }]}>
+        <View style={[styles.alertIcon, { backgroundColor: theme.colors.card }]}>
+          <Ionicons name="warning" size={18} color={theme.colors.warning} />
         </View>
-        <View>
-          <Text style={styles.alertTitle}>{lostCount} bé đang thất lạc trong khu vực bạn</Text>
-          <Text style={styles.alertDesc}>Nếu bạn gặp những bé này, hãy liên hệ với chủ nhân ngay nhé!</Text>
+        <View style={{ flex: 1 }}>
+          <Text style={[styles.alertTitle, { color: theme.colors.text }]}>{t('lostPets:alertTitle', { count: lostCount })}</Text>
+          <Text style={[styles.alertDesc, { color: theme.colors.muted }]}>{t('lostPets:alertDesc')}</Text>
         </View>
       </View>
 
       {/* Filter chips */}
       <View style={styles.filterRow}>
-        {FILTER_LABELS.map(({ id, label }, i) => (
-          <Pressable
-            key={id}
-            style={[styles.filterChip, filter === id && styles.filterChipActive]}
-            onPress={() => setFilter(id)}
-          >
-            <Text style={[styles.filterChipText, filter === id && styles.filterChipTextActive]}>
-              {label}
-            </Text>
-          </Pressable>
-        ))}
+        {FILTER_LABELS.map(({ id, label }) => {
+          const isActive = filter === id;
+          return (
+            <Pressable
+              key={id}
+              style={[
+                styles.filterChip,
+                { backgroundColor: isActive ? theme.colors.primary : theme.colors.card, borderColor: theme.colors.border },
+              ]}
+              onPress={() => setFilter(id)}
+            >
+              <Text style={[styles.filterChipText, { color: isActive ? 'white' : theme.colors.text }]}>
+                {label}
+              </Text>
+            </Pressable>
+          );
+        })}
       </View>
 
       {/* Pet List */}
       {loading ? (
         <View style={{ alignItems: 'center', paddingVertical: 40 }}>
-          <ActivityIndicator size="large" color="#FFB340" />
+          <ActivityIndicator size="large" color={theme.colors.warning} />
         </View>
       ) : error ? (
         <View style={{ alignItems: 'center', paddingVertical: 40 }}>
-          <Text style={{ color: '#888', textAlign: 'center' }}>{error}</Text>
+          <Text style={{ color: theme.colors.error, textAlign: 'center' }}>{error}</Text>
         </View>
       ) : filtered.length === 0 ? (
         <View style={{ alignItems: 'center', paddingVertical: 60 }}>
-          <Text style={{ fontSize: 20, fontWeight: '700', color: '#1A1A1A', marginBottom: 10 }}>
-            Không có kết quả
+          <Text style={{ fontSize: 20, fontWeight: '700', color: theme.colors.text, marginBottom: 10 }}>
+            {t('lostPets:emptyTitle')}
           </Text>
-          <Text style={{ fontSize: 14, color: '#888' }}>Không tìm thấy bé nào trong mục này.</Text>
+          <Text style={{ fontSize: 14, color: theme.colors.muted }}>{t('lostPets:emptyDesc')}</Text>
         </View>
       ) : (
-        filtered.map((pet, i) => (
+        filtered.map((pet) => (
           <Pressable
             key={pet.id}
             style={({ pressed }) => [
               styles.reportCard,
-              { borderColor: pet.type === 'lost' ? '#FFECD0' : '#D6F5E0' },
+              { backgroundColor: theme.colors.card, borderColor: pet.type === 'lost' ? theme.colors.warningContainer : theme.colors.successContainer },
               pressed && { opacity: 0.85 },
             ]}
           >
             {pet.image ? (
               <Image source={{ uri: pet.image }} style={styles.reportImage} />
             ) : (
-              <View style={[styles.reportImage, styles.reportImagePlaceholder]}>
-                <Ionicons name="paw" size={28} color="#CCCCCC" />
+              <View style={[styles.reportImage, { backgroundColor: theme.colors.surface, alignItems: 'center', justifyContent: 'center' }]}>
+                <Ionicons name="paw" size={28} color={theme.colors.muted} />
               </View>
             )}
             <View style={styles.reportInfo}>
               <View style={styles.reportBadgeRow}>
                 <View style={[
                   styles.reportTypeBadge,
-                  { backgroundColor: pet.type === 'lost' ? '#FFF4E0' : '#E8F8EE' },
+                  { backgroundColor: pet.type === 'lost' ? theme.colors.warningContainer : theme.colors.successContainer },
                 ]}>
                   <Text style={[
                     styles.reportTypeBadgeText,
-                    { color: pet.type === 'lost' ? '#FFB340' : '#34C759' },
+                    { color: pet.type === 'lost' ? theme.colors.warning : theme.colors.success },
                   ]}>
-                    {pet.type === 'lost' ? '⚠ Thất lạc' : '✓ Đã tìm thấy'}
+                    {pet.type === 'lost' ? t('lostPets:badgeLost') : t('lostPets:badgeFound')}
                   </Text>
                 </View>
               </View>
-              <Text style={styles.reportName}>{pet.name}</Text>
+              <Text style={[styles.reportName, { color: theme.colors.text }]}>{pet.name}</Text>
               <View style={styles.reportMetaRow}>
-                <Ionicons name="location-outline" size={11} color="#888" />
-                <Text style={styles.reportLocation} numberOfLines={1}>{pet.location}</Text>
+                <Ionicons name="location-outline" size={11} color={theme.colors.muted} />
+                <Text style={[styles.reportLocation, { color: theme.colors.muted }]} numberOfLines={1}>{pet.location}</Text>
               </View>
               <View style={styles.reportMetaRow}>
-                <Ionicons name="calendar-outline" size={11} color="#BBBBBB" />
-                <Text style={styles.reportDate}>{pet.date}</Text>
+                <Ionicons name="calendar-outline" size={11} color={theme.colors.muted} />
+                <Text style={[styles.reportDate, { color: theme.colors.muted }]}>{pet.date}</Text>
               </View>
             </View>
             <View style={[
               styles.statusDot,
-              { backgroundColor: pet.type === 'lost' ? '#FFB340' : '#34C759' },
+              { backgroundColor: pet.type === 'lost' ? theme.colors.warning : theme.colors.success },
             ]} />
           </Pressable>
         ))
@@ -272,19 +274,18 @@ export default function LostPetsScreen() {
 
       {/* Report button */}
       <Pressable
-        style={({ pressed }) => [styles.reportBtn, pressed && { opacity: 0.85 }]}
-        // TODO: navigate to report creation flow when backend supports POST /reports
+        style={({ pressed }) => [styles.reportBtn, { backgroundColor: theme.colors.warning, shadowColor: theme.colors.warning }, pressed && { opacity: 0.85 }]}
         onPress={() => Alert.alert('Đang phát triển', 'Tính năng báo cáo thất lạc đang được phát triển')}
       >
         <Ionicons name="warning" size={20} color="white" />
-        <Text style={styles.reportBtnText}>Báo cáo thú cưng thất lạc</Text>
+        <Text style={styles.reportBtnText}>{t('lostPets:reportBtn')}</Text>
       </Pressable>
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: '#FFF9FC' },
+  screen: { flex: 1 },
   content: { paddingHorizontal: 24 },
   header: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
@@ -292,57 +293,53 @@ const styles = StyleSheet.create({
   },
   headerLeft: { flexDirection: 'row', alignItems: 'center', gap: 14 },
   backBtn: {
-    width: 44, height: 44, borderRadius: 14, backgroundColor: 'white',
+    width: 44, height: 44, borderRadius: 14,
     alignItems: 'center', justifyContent: 'center',
     shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.08, shadowRadius: 6, elevation: 3,
   },
   headerTag: {
-    color: '#FFB340', fontSize: 11, fontWeight: '800',
+    fontSize: 11, fontWeight: '800',
     letterSpacing: 1.5, textTransform: 'uppercase', marginBottom: 3,
   },
-  headerTitle: { fontSize: 24, fontWeight: '800', color: '#1A1A1A' },
+  headerTitle: { fontSize: 24, fontWeight: '800' },
   headerActions: { flexDirection: 'row', gap: 8 },
   iconBtn: {
-    width: 44, height: 44, borderRadius: 14, backgroundColor: 'white',
+    width: 44, height: 44, borderRadius: 14,
     alignItems: 'center', justifyContent: 'center',
     shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.08, shadowRadius: 6, elevation: 3,
   },
   alertBanner: {
     borderRadius: 20, padding: 16, marginBottom: 20,
-    backgroundColor: '#FFF8E8', borderWidth: 1.5, borderColor: '#FFE5A0',
+    borderWidth: 1.5,
     flexDirection: 'row', alignItems: 'flex-start', gap: 12,
   },
   alertIcon: {
-    width: 38, height: 38, borderRadius: 12, backgroundColor: 'white',
+    width: 38, height: 38, borderRadius: 12,
     alignItems: 'center', justifyContent: 'center', flexShrink: 0,
     shadowColor: '#FFB340', shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.20, shadowRadius: 4, elevation: 3,
   },
-  alertTitle: { fontSize: 14, fontWeight: '700', color: '#1A1A1A', marginBottom: 4 },
-  alertDesc: { fontSize: 12, color: '#888', lineHeight: 18 },
+  alertTitle: { fontSize: 14, fontWeight: '700', marginBottom: 4 },
+  alertDesc: { fontSize: 12, lineHeight: 18 },
   filterRow: { flexDirection: 'row', gap: 8, marginBottom: 4 },
   filterChip: {
-    backgroundColor: 'white', borderRadius: 20, paddingHorizontal: 16, paddingVertical: 8,
+    borderRadius: 20, paddingHorizontal: 16, paddingVertical: 8,
     shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.06, shadowRadius: 6, elevation: 2,
+    borderWidth: 1,
   },
-  filterChipActive: { backgroundColor: '#1A1A1A', shadowOpacity: 0 },
-  filterChipText: { fontSize: 13, fontWeight: '600', color: '#888' },
-  filterChipTextActive: { color: 'white' },
+  filterChipText: { fontSize: 13, fontWeight: '600' },
   // Report card
   reportCard: {
-    backgroundColor: 'white', borderRadius: 22, padding: 18, marginTop: 14,
+    borderRadius: 22, padding: 18, marginTop: 14,
     shadowColor: '#000', shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.08, shadowRadius: 12, elevation: 4,
     borderWidth: 1.5,
     flexDirection: 'row', alignItems: 'center', gap: 14,
   },
   reportImage: { width: 80, height: 80, borderRadius: 18, flexShrink: 0 },
-  reportImagePlaceholder: {
-    backgroundColor: '#F5F5F5', alignItems: 'center', justifyContent: 'center',
-  },
   reportInfo: { flex: 1, minWidth: 0 },
   reportBadgeRow: { marginBottom: 5 },
   reportTypeBadge: {
@@ -350,19 +347,19 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-start',
   },
   reportTypeBadgeText: { fontSize: 11, fontWeight: '700' },
-  reportName: { fontSize: 17, fontWeight: '800', color: '#1A1A1A', marginBottom: 5 },
+  reportName: { fontSize: 17, fontWeight: '800', marginBottom: 5 },
   reportMetaRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 4 },
-  reportLocation: { fontSize: 12, color: '#888', flex: 1 },
-  reportDate: { fontSize: 12, color: '#BBBBBB' },
+  reportLocation: { fontSize: 12, flex: 1 },
+  reportDate: { fontSize: 12 },
   statusDot: {
     width: 8, height: 8, borderRadius: 4, flexShrink: 0, marginRight: 4,
   },
   // Report button
   reportBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10,
-    backgroundColor: '#FFB340', borderRadius: 20, paddingVertical: 18,
+    borderRadius: 20, paddingVertical: 18,
     marginTop: 22,
-    shadowColor: '#FFB340', shadowOffset: { width: 0, height: 6 },
+    shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.38, shadowRadius: 14, elevation: 8,
   },
   reportBtnText: { color: 'white', fontSize: 16, fontWeight: '700' },

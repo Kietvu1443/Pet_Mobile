@@ -1,4 +1,15 @@
+<<<<<<< HEAD
 # Learn more https://docs.github.com/en/get-started/getting-started-with-git/ignoring-files
+=======
+# Core project directories to keep (only Pet_helper and Pet_Mobile)
+# Ignore all other root directories
+/.agents/
+/.kilo/
+/Premium Mobile UI Design/
+/graphify-out/
+/plan/
+/other  
+>>>>>>> 4c4742f (feat(i18n): add localization support for Vietnamese and English)
 
 # dependencies
 node_modules/

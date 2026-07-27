@@ -24,6 +24,7 @@ import { Circle, Ellipse, Path, Svg } from 'react-native-svg';
 
 import { ApiError } from '@/lib/api/client';
 import { useAuth } from '@/lib/auth/AuthContext';
+import { useTheme } from '@/lib/theme/ThemeContext';
 
 // ─── Nhân vật cún hoạt họa SVG ───────────────────────────────────────────────
 function DogCharacter() {
@@ -188,28 +189,30 @@ function InputPill({
   onSubmitEditing?: () => void;
   rightElement?: React.ReactNode;
 }) {
+  const { theme } = useTheme();
   const [focused, setFocused] = useState(false);
 
   return (
     <View
       style={[
         styles.inputPill,
-        focused && styles.inputPillFocused,
-        !editable && styles.inputPillDisabled,
+        { backgroundColor: theme.colors.card, borderColor: theme.colors.border },
+        focused && { borderColor: theme.colors.primary, borderWidth: 2 },
+        !editable && { opacity: 0.6 },
       ]}
     >
       <Ionicons
         name={iconName}
         size={20}
-        color={focused ? '#83541D' : '#837468'}
+        color={focused ? theme.colors.primary : theme.colors.muted}
         style={styles.inputIcon}
       />
       <TextInput
-        style={styles.inputText}
+        style={[styles.inputText, { color: theme.colors.text }]}
         value={value}
         onChangeText={onChangeText}
         placeholder={placeholder}
-        placeholderTextColor="rgba(131,116,104,0.5)"
+        placeholderTextColor={theme.colors.muted}
         secureTextEntry={secureTextEntry}
         editable={editable}
         autoCapitalize={autoCapitalize}
@@ -224,8 +227,9 @@ function InputPill({
   );
 }
 
-// ─── Màn hình chính ──────────────────────────────────────────────────────────
+// ─── Component chính ──────────────────────────────────────────────────────────
 export default function LoginScreen() {
+  const { theme } = useTheme();
   const { login } = useAuth();
   const router = useRouter();
   const [displayName, setDisplayName] = useState('');
@@ -243,7 +247,6 @@ export default function LoginScreen() {
     setError('');
     try {
       await login(displayName.trim(), password);
-      // Route gate tự chuyển về (tabs) sau khi user được set.
     } catch (e) {
       const message =
         e instanceof ApiError
@@ -257,7 +260,7 @@ export default function LoginScreen() {
 
   return (
     <KeyboardAvoidingView
-      style={styles.flex}
+      style={[styles.flex, { backgroundColor: theme.colors.background }]}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
       {/* Biểu tượng trang trí nền */}
@@ -270,20 +273,21 @@ export default function LoginScreen() {
       <ScrollView
         contentContainerStyle={styles.scroll}
         keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="interactive"
         showsVerticalScrollIndicator={false}
       >
         {/* ── Khu vực minh họa ── */}
         <View style={styles.illustrationWrapper}>
           <SpeechBubble />
-          <View style={styles.dogCircle}>
+          <View style={[styles.dogCircle, { borderColor: theme.colors.border }]}>
             <DogCharacter />
           </View>
         </View>
 
         {/* ── Tiêu đề ── */}
         <View style={styles.headerText}>
-          <Text style={styles.title}>Đăng nhập</Text>
-          <Text style={styles.subtitle}>Vui lòng đăng nhập để tiếp tục!</Text>
+          <Text style={[styles.title, { color: theme.colors.text }]}>Đăng nhập</Text>
+          <Text style={[styles.subtitle, { color: theme.colors.muted }]}>Vui lòng đăng nhập để tiếp tục!</Text>
         </View>
 
         {/* ── Form ── */}
@@ -304,18 +308,18 @@ export default function LoginScreen() {
             onChangeText={setPassword}
             secureTextEntry={!showPassword}
             editable={!submitting}
-            returnKeyType="go"
+            returnKeyType="done"
             onSubmitEditing={handleSubmit}
             rightElement={
               <Pressable
-                onPress={() => setShowPassword((v) => !v)}
-                hitSlop={8}
+                onPress={() => setShowPassword(!showPassword)}
                 style={styles.eyeBtn}
+                hitSlop={8}
               >
                 <Ionicons
                   name={showPassword ? 'eye-off-outline' : 'eye-outline'}
-                  size={20}
-                  color="#837468"
+                  size={18}
+                  color={theme.colors.muted}
                 />
               </Pressable>
             }
@@ -326,7 +330,7 @@ export default function LoginScreen() {
 
           {/* Nút Đăng nhập */}
           <TouchableOpacity
-            style={[styles.loginBtn, !canSubmit && styles.loginBtnDisabled]}
+            style={[styles.loginBtn, { backgroundColor: theme.colors.primary, shadowColor: theme.colors.primary }, !canSubmit && styles.loginBtnDisabled]}
             onPress={handleSubmit}
             disabled={!canSubmit}
             activeOpacity={0.85}
@@ -521,6 +525,16 @@ const styles = StyleSheet.create({
     padding: 2,
   },
   // Error
+  errorBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    borderWidth: 1.5,
+    borderRadius: 16,
+    padding: 12,
+    marginTop: 4,
+  },
   errorText: {
     fontFamily: 'Fredoka_400Regular',
     fontSize: 14,
@@ -528,13 +542,14 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   // Login button
+  btnWrapper: {
+    width: '100%',
+    marginTop: 4,
+  },
   loginBtn: {
-    backgroundColor: ACCENT,
     borderRadius: 50,
     paddingVertical: 16,
     alignItems: 'center',
-    marginTop: 6,
-    shadowColor: PRIMARY,
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.2,
     shadowRadius: 10,

@@ -1,10 +1,10 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useColorScheme as rnUseColorScheme } from 'react-native';
 
-import { getTheme, setTheme as saveThemeToStore, type Theme } from '@/lib/storage/settingsStore';
+import { getTheme, setTheme as saveThemeToStore, type ThemeMode } from '@/lib/storage/settingsStore';
 
-let currentThemeValue: Theme = 'system';
-const listeners = new Set<(theme: Theme) => void>();
+let currentThemeValue: ThemeMode = 'system';
+const listeners = new Set<(theme: ThemeMode) => void>();
 
 // Load the stored theme immediately at module load to prevent start-up visual flashing
 void getTheme().then((t) => {
@@ -12,12 +12,12 @@ void getTheme().then((t) => {
   listeners.forEach(l => l(t));
 }).catch(() => {});
 
-function notify(theme: Theme) {
+function notify(theme: ThemeMode) {
   currentThemeValue = theme;
   listeners.forEach(l => l(theme));
 }
 
-export async function notifyThemeChange(theme: Theme): Promise<void> {
+export async function notifyThemeChange(theme: ThemeMode): Promise<void> {
   await saveThemeToStore(theme);
   notify(theme);
 }
@@ -32,7 +32,7 @@ export function useColorScheme(): 'light' | 'dark' {
       setTheme(t);
     }).catch(() => {});
 
-    const listener = (t: Theme) => setTheme(t);
+    const listener = (t: ThemeMode) => setTheme(t);
     listeners.add(listener);
     return () => { listeners.delete(listener); };
   }, []);

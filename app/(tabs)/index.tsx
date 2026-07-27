@@ -38,7 +38,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 
 import { useUnreadNotifications } from '@/lib/notifications/unread';
+import { useTranslation } from 'react-i18next';
 import { useRouter } from 'expo-router';
+import { useTheme } from '@/lib/theme/ThemeContext';
 
 import { usePetQueue } from '@/lib/snap/usePetQueue';
 import { apiRequest } from '@/lib/api/client';
@@ -101,11 +103,6 @@ function formatDate(iso: string): string {
   }
 }
 
-const STATUS_LABELS: Record<AdoptionRequest['status'], { label: string; bg: string; color: string }> = {
-  pending:  { label: 'Chờ duyệt',    bg: '#FFF8E8', color: '#FFB340' },
-  approved: { label: 'Đã duyệt',     bg: '#E8F8EE', color: '#34C759' },
-  rejected: { label: 'Bị từ chối',   bg: '#FFF0F0', color: '#FF4D4F' },
-};
 
 // ---------------------------------------------------------------------------
 // SwipeCard — faithful recreation of reference design in React Native
@@ -284,18 +281,19 @@ function ActionBtn({
   badge?: string;
   disabled?: boolean;
 }) {
+  const { theme } = useTheme();
   return (
     <Pressable
       onPress={onPress}
       disabled={disabled}
       style={({ pressed }) => [
         styles.actionBtn,
-        { width: size, height: size, shadowColor: shadow, opacity: disabled ? 0.5 : pressed ? 0.85 : 1 },
+        { backgroundColor: theme.colors.card, width: size, height: size, shadowColor: shadow, opacity: disabled ? 0.5 : pressed ? 0.85 : 1 },
       ]}
     >
       {children}
       {badge && (
-        <View style={styles.actionBtnBadge}>
+        <View style={[styles.actionBtnBadge, { backgroundColor: theme.colors.primary, borderColor: theme.colors.card }]}>
           <Text style={styles.actionBtnBadgeText}>{badge}</Text>
         </View>
       )}
@@ -307,6 +305,7 @@ function ActionBtn({
 // ConnectedTab — adoption requests from backend
 // ---------------------------------------------------------------------------
 function ConnectedTab() {
+  const { theme } = useTheme();
   const [requests, setRequests] = useState<AdoptionRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeFilter, setActiveFilter] = useState('all');
@@ -341,7 +340,7 @@ function ConnectedTab() {
   if (loading) {
     return (
       <View style={{ alignItems: 'center', paddingVertical: 40 }}>
-        <ActivityIndicator color="#FF4FA3" />
+        <ActivityIndicator color={theme.colors.primary} />
       </View>
     );
   }
@@ -350,67 +349,77 @@ function ConnectedTab() {
     <View style={{ paddingTop: 16 }}>
       {/* Filter chips */}
       <View style={styles.connectedFilters}>
-        {filters.map((f) => (
-          <Pressable
-            key={f.id}
-            style={[styles.connFilter, activeFilter === f.id && styles.connFilterActive]}
-            onPress={() => setActiveFilter(f.id)}
-          >
-            <Text style={[styles.connFilterText, activeFilter === f.id && styles.connFilterTextActive]}>
-              {f.label}
-            </Text>
-            {f.count > 0 && (
-              <View style={[styles.connFilterBadge, activeFilter === f.id && styles.connFilterBadgeActive]}>
-                <Text style={styles.connFilterBadgeText}>{f.count}</Text>
-              </View>
-            )}
-          </Pressable>
-        ))}
+        {filters.map((f) => {
+          const isActive = activeFilter === f.id;
+          return (
+            <Pressable
+              key={f.id}
+              style={[
+                styles.connFilter,
+                { backgroundColor: isActive ? theme.colors.primary : theme.colors.card, borderColor: theme.colors.border },
+              ]}
+              onPress={() => setActiveFilter(f.id)}
+            >
+              <Text style={[styles.connFilterText, { color: isActive ? 'white' : theme.colors.text }]}>
+                {f.label}
+              </Text>
+              {f.count > 0 && (
+                <View style={[styles.connFilterBadge, { backgroundColor: isActive ? 'rgba(255,255,255,0.25)' : theme.colors.primary }]}>
+                  <Text style={styles.connFilterBadgeText}>{f.count}</Text>
+                </View>
+              )}
+            </Pressable>
+          );
+        })}
       </View>
 
       {filtered.length === 0 ? (
         <View style={styles.emptyConnected}>
-          <View style={styles.emptyConnectedIcon}>
-            <Ionicons name="heart-outline" size={30} color="#FF83C4" />
+          <View style={[styles.emptyConnectedIcon, { backgroundColor: theme.colors.primaryContainer }]}>
+            <Ionicons name="heart-outline" size={30} color={theme.colors.primary} />
           </View>
-          <Text style={styles.emptyConnectedTitle}>Chưa kết nối</Text>
-          <Text style={styles.emptyConnectedSub}>Thích một bé để bắt đầu kết nối!</Text>
+          <Text style={[styles.emptyConnectedTitle, { color: theme.colors.text }]}>Chưa kết nối</Text>
+          <Text style={[styles.emptyConnectedSub, { color: theme.colors.muted }]}>Thích một bé để bắt đầu kết nối!</Text>
         </View>
       ) : (
         <View style={{ gap: 14 }}>
           {filtered.map((req) => {
-            const statusCfg = STATUS_LABELS[req.status];
+            const isApproved = req.status === 'approved';
+            const isRejected = req.status === 'rejected';
+            const bg = isApproved ? theme.colors.successContainer : isRejected ? theme.colors.errorContainer : theme.colors.warningContainer;
+            const color = isApproved ? theme.colors.success : isRejected ? theme.colors.error : theme.colors.warning;
+            const label = isApproved ? 'Đã duyệt' : isRejected ? 'Bị từ chối' : 'Chờ duyệt';
             return (
-              <View key={req.id} style={styles.requestCard}>
+              <View key={req.id} style={[styles.requestCard, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}>
                 <View style={styles.requestCardTop}>
                   {req.petImage ? (
                     <Image source={{ uri: req.petImage }} style={styles.requestPetImage} />
                   ) : (
-                    <View style={[styles.requestPetImage, { backgroundColor: '#F5F5F5', alignItems: 'center', justifyContent: 'center' }]}>
-                      <Ionicons name="paw" size={24} color="#CCCCCC" />
+                    <View style={[styles.requestPetImage, { backgroundColor: theme.colors.surface, alignItems: 'center', justifyContent: 'center' }]}>
+                      <Ionicons name="paw" size={24} color={theme.colors.muted} />
                     </View>
                   )}
                   <View style={{ flex: 1, minWidth: 0 }}>
                     <View style={styles.requestNameRow}>
-                      <Text style={styles.requestPetName}>{req.petName}</Text>
-                      <View style={[styles.requestStatusBadge, { backgroundColor: statusCfg.bg }]}>
-                        <Text style={[styles.requestStatusText, { color: statusCfg.color }]}>{statusCfg.label}</Text>
+                      <Text style={[styles.requestPetName, { color: theme.colors.text }]}>{req.petName}</Text>
+                      <View style={[styles.requestStatusBadge, { backgroundColor: bg }]}>
+                        <Text style={[styles.requestStatusText, { color }]}>{label}</Text>
                       </View>
-                      <Text style={styles.requestDate}>{formatDate(req.createdAt)}</Text>
+                      <Text style={[styles.requestDate, { color: theme.colors.muted }]}>{formatDate(req.createdAt)}</Text>
                     </View>
-                    <Text style={styles.requestMeta}>
+                    <Text style={[styles.requestMeta, { color: theme.colors.muted }]}>
                       {[req.petBreed, req.petAge, req.petGender === 'male' ? 'Đực' : req.petGender === 'female' ? 'Cái' : null].filter(Boolean).join(' · ')}
                     </Text>
                   </View>
                 </View>
                 {req.status === 'pending' && (
-                  <View style={styles.pendingNotice}>
-                    <View style={styles.pendingNoticeIcon}>
-                      <Ionicons name="time-outline" size={16} color="#FFB340" />
+                  <View style={[styles.pendingNotice, { backgroundColor: theme.colors.warningContainer, borderColor: theme.colors.warning }]}>
+                    <View style={[styles.pendingNoticeIcon, { backgroundColor: theme.colors.card }]}>
+                      <Ionicons name="time-outline" size={16} color={theme.colors.warning} />
                     </View>
                     <View>
-                      <Text style={styles.pendingNoticeTitle}>Chờ trại duyệt</Text>
-                      <Text style={styles.pendingNoticeSub}>Trại đang xem xét yêu cầu của bạn</Text>
+                      <Text style={[styles.pendingNoticeTitle, { color: theme.colors.warning }]}>Chờ trại duyệt</Text>
+                      <Text style={[styles.pendingNoticeSub, { color: theme.colors.muted }]}>Trại đang xem xét yêu cầu của bạn</Text>
                     </View>
                   </View>
                 )}
@@ -427,9 +436,11 @@ function ConnectedTab() {
 // AdoptScreen
 // ---------------------------------------------------------------------------
 export default function AdoptScreen() {
+  const { theme } = useTheme();
   const { queue, status, errorMsg, acting, like, dislike, reload } = usePetQueue();
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const { t } = useTranslation(['tabs', 'common']);
   const { unread } = useUnreadNotifications();
 
   const [activeTab, setActiveTab] = useState<'explore' | 'connected'>('explore');
@@ -454,37 +465,37 @@ export default function AdoptScreen() {
   }, [currentPet, router]);
 
   return (
-    <View style={[styles.screen, { paddingTop: insets.top }]}>
+    <View style={[styles.screen, { backgroundColor: theme.colors.background, paddingTop: insets.top }]}>
       {/* Header */}
       <View style={styles.header}>
         <View>
-          <Text style={styles.headerTag}>Nhận nuôi</Text>
-          <Text style={styles.headerTitle}>Khám phá</Text>
+          <Text style={[styles.headerTag, { color: theme.colors.primary }]}>{t('tabs:adopt')}</Text>
+          <Text style={[styles.headerTitle, { color: theme.colors.text }]}>{t('tabs:explore')}</Text>
         </View>
         <View style={styles.headerActions}>
-          <Pressable style={styles.iconBtn} onPress={() => router.push('/notifications')}>
-            <Ionicons name="notifications-outline" size={18} color="#888" />
+          <Pressable style={[styles.iconBtn, { backgroundColor: theme.colors.card }]} onPress={() => router.push('/notifications')}>
+            <Ionicons name="notifications-outline" size={18} color={theme.colors.text} />
             {unread > 0 && (
-              <View style={styles.notifBadge}>
+              <View style={[styles.notifBadge, { backgroundColor: theme.colors.error }]}>
                 <Text style={styles.notifBadgeText}>{unread > 99 ? '99+' : unread}</Text>
               </View>
             )}
           </Pressable>
-          <Pressable style={styles.iconBtn}>
-            <Ionicons name="options-outline" size={18} color="#888" />
-            <View style={styles.filterDot} />
+          <Pressable style={[styles.iconBtn, { backgroundColor: theme.colors.card }]}>
+            <Ionicons name="options-outline" size={18} color={theme.colors.text} />
+            <View style={[styles.filterDot, { backgroundColor: theme.colors.primary }]} />
           </Pressable>
         </View>
       </View>
 
       {/* Tabs */}
-      <View style={styles.tabs}>
+      <View style={[styles.tabs, { borderBottomColor: theme.colors.border }]}>
         {(['explore', 'connected'] as const).map((tab) => (
           <Pressable key={tab} onPress={() => setActiveTab(tab)} style={styles.tabItem}>
-            <Text style={[styles.tabText, activeTab === tab && styles.tabTextActive]}>
-              {tab === 'explore' ? 'Khám phá' : 'Đã kết nối'}
+            <Text style={[styles.tabText, activeTab === tab && styles.tabTextActive, { color: activeTab === tab ? theme.colors.text : theme.colors.muted }]}>
+              {tab === 'explore' ? t('tabs:explore') : t('tabs:connected')}
             </Text>
-            <View style={[styles.tabUnderline, activeTab === tab && styles.tabUnderlineActive]} />
+            <View style={[styles.tabUnderline, { backgroundColor: 'transparent' }, activeTab === tab && { backgroundColor: theme.colors.primary }]} />
           </Pressable>
         ))}
       </View>
@@ -495,25 +506,25 @@ export default function AdoptScreen() {
           {/* Card Area */}
           <View style={styles.cardArea}>
             {status === 'loading' ? (
-              <View style={styles.stateBox}>
-                <ActivityIndicator size="large" color="#FF4FA3" />
-                <Text style={styles.stateMuted}>Đang tìm thú cưng phù hợp…</Text>
+              <View style={[styles.stateBox, { backgroundColor: theme.colors.card }]}>
+                <ActivityIndicator size="large" color={theme.colors.primary} />
+                <Text style={[styles.stateMuted, { color: theme.colors.muted }]}>Đang tìm thú cưng phù hợp…</Text>
               </View>
             ) : status === 'error' ? (
-              <View style={styles.stateBox}>
-                <View style={styles.stateEmoji}><Text style={{ fontSize: 40 }}>😿</Text></View>
-                <Text style={styles.stateTitle}>Không thể tải</Text>
-                <Text style={styles.stateMuted}>{errorMsg}</Text>
-                <Pressable style={styles.stateBtn} onPress={reload}>
+              <View style={[styles.stateBox, { backgroundColor: theme.colors.card }]}>
+                <View style={[styles.stateEmoji, { backgroundColor: theme.colors.primaryContainer }]}><Text style={{ fontSize: 40 }}>😿</Text></View>
+                <Text style={[styles.stateTitle, { color: theme.colors.text }]}>Không thể tải</Text>
+                <Text style={[styles.stateMuted, { color: theme.colors.muted }]}>{errorMsg}</Text>
+                <Pressable style={[styles.stateBtn, { backgroundColor: theme.colors.primary }]} onPress={reload}>
                   <Text style={styles.stateBtnText}>Thử lại</Text>
                 </Pressable>
               </View>
             ) : !ready ? (
-              <View style={styles.stateBox}>
-                <View style={styles.stateEmoji}><Text style={{ fontSize: 40 }}>🐾</Text></View>
-                <Text style={styles.stateTitle}>Đã hết rồi!</Text>
-                <Text style={styles.stateMuted}>Bạn đã xem hết các bé hôm nay. Quay lại sau nhé!</Text>
-                <Pressable style={styles.stateBtn} onPress={reload}>
+              <View style={[styles.stateBox, { backgroundColor: theme.colors.card }]}>
+                <View style={[styles.stateEmoji, { backgroundColor: theme.colors.primaryContainer }]}><Text style={{ fontSize: 40 }}>🐾</Text></View>
+                <Text style={[styles.stateTitle, { color: theme.colors.text }]}>Đã hết rồi!</Text>
+                <Text style={[styles.stateMuted, { color: theme.colors.muted }]}>Bạn đã xem hết các bé hôm nay. Quay lại sau nhé!</Text>
+                <Pressable style={[styles.stateBtn, { backgroundColor: theme.colors.primary }]} onPress={reload}>
                   <Text style={styles.stateBtnText}>Tải lại</Text>
                 </Pressable>
               </View>
@@ -632,8 +643,8 @@ const styles = StyleSheet.create({
     marginBottom: 0,
   },
   tabItem: { paddingBottom: 12 },
-  tabText: { fontSize: 15, fontWeight: '500', color: '#AAAAAA' },
-  tabTextActive: { fontWeight: '700', color: '#1A1A1A' },
+  tabText: { fontSize: 15, fontWeight: '500' },
+  tabTextActive: { fontWeight: '700' },
   tabUnderline: { height: 2, borderRadius: 2, backgroundColor: 'transparent', marginTop: 2 },
   tabUnderlineActive: { backgroundColor: '#FF4FA3' },
   // Card area

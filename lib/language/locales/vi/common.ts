@@ -1,0 +1,18 @@
+export default {
+  appName: 'Pet Helper',
+  addPet: 'Thêm thú cưng',
+  save: 'Lưu thay đổi',
+  cancel: 'Huỷ',
+  back: 'Quay lại',
+  next: 'Tiếp tục',
+  loading: 'Đang tải...',
+  retry: 'Thử lại',
+  search: 'Tìm kiếm',
+  saved: 'Đã lưu',
+  delete: 'Xoá',
+  confirm: 'Xác nhận',
+  close: 'Đóng',
+  hello: 'Xin chào',
+  noData: 'Không có dữ liệu',
+  error: 'Đã xảy ra lỗi',
+};

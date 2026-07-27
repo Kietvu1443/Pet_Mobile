@@ -1,0 +1,16 @@
+export default {
+  title: 'Info & Legal',
+  tabPrivacy: 'Privacy Policy',
+  tabTerms: 'Terms of Service',
+  tabAbout: 'About',
+  privacyTitle: 'Privacy Policy',
+  privacyContent1: 'Pet Helper is committed to protecting your personal information. We only collect data necessary to provide pet adoption connection services.',
+  privacyContent2: 'Collected information includes: full name, email, phone number, address, and pet photos. Data is stored securely and never shared with third parties.',
+  privacyContent3: 'You have the right to request data deletion at any time by contacting our support email.',
+  termsTitle: 'Terms of Service',
+  termsContent1: 'By using Pet Helper, you agree to comply with pet care regulations and provide accurate information.',
+  termsContent2: 'We reserve the right to suspend or ban accounts that violate animal welfare policies or provide false information.',
+  aboutTitle: 'About Pet Helper',
+  aboutContent1: 'Pet Helper is a pet adoption connection platform helping pets find loving families.',
+  aboutVersion: 'Version {{version}}',
+};

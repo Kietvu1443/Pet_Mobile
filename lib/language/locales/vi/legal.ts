@@ -1,0 +1,16 @@
+export default {
+  title: 'Thông tin & Pháp lý',
+  tabPrivacy: 'Chính sách bảo mật',
+  tabTerms: 'Điều khoản dịch vụ',
+  tabAbout: 'Giới thiệu',
+  privacyTitle: 'Chính sách bảo mật',
+  privacyContent1: 'Pet Helper cam kết bảo vệ thông tin cá nhân của bạn. Chúng tôi chỉ thu thập dữ liệu cần thiết để cung cấp dịch vụ kết nối nhận nuôi thú cưng.',
+  privacyContent2: 'Thông tin thu thập bao gồm: họ tên, email, số điện thoại, địa chỉ và hình ảnh thú cưng. Dữ liệu được lưu trữ an toàn và không chia sẻ với bên thứ ba.',
+  privacyContent3: 'Bạn có quyền yêu cầu xoá dữ liệu bất cứ lúc nào bằng cách liên hệ với chúng tôi qua email hỗ trợ.',
+  termsTitle: 'Điều khoản dịch vụ',
+  termsContent1: 'Bằng việc sử dụng Pet Helper, bạn đồng ý tuân thủ các quy định về chăm sóc thú cưng và cung cấp thông tin trung thực.',
+  termsContent2: 'Chúng tôi có quyền từ chối hoặc khoá tài khoản vi phạm các chính sách về ngược đãi động vật hoặc thông tin sai sự thật.',
+  aboutTitle: 'Về Pet Helper',
+  aboutContent1: 'Pet Helper là nền tảng kết nối nhận nuôi thú cưng, giúp các bé tìm được gia đình yêu thương.',
+  aboutVersion: 'Phiên bản {{version}}',
+};

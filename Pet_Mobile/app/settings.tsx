@@ -18,6 +18,8 @@ import { useTheme } from '@/lib/theme/ThemeContext';
 import { useTranslation } from 'react-i18next';
 import { setLanguage, type Language, ACCENT_COLORS, type AccentColorKey, type ThemeMode } from '@/lib/storage/settingsStore';
 import { notifyThemeChange } from '@/hooks/use-color-scheme';
+import { useOTAStore } from '@/lib/updates/otaStore';
+import { UpdateModal } from '@/components/UpdateModal';
 
 const LANGUAGES: { id: Language; label: Record<string, string> }[] = [
   { id: 'vi', label: { vi: 'Tiếng Việt', en: 'Vietnamese' } },
@@ -97,6 +99,9 @@ export default function SettingsScreen() {
     }
   };
 
+  const { hasUpdate, isDownloaded, isChecking } = useOTAStore();
+  const [showUpdateModal, setShowUpdateModal] = useState(false);
+
   return (
     <Animated.View style={[styles.screen, { backgroundColor: theme.colors.background, paddingTop: insets.top }]}>
       <ScrollView
@@ -158,6 +163,28 @@ export default function SettingsScreen() {
           ))}
         </View>
 
+        {/* Software Updates */}
+        <Text style={[styles.sectionLabel, { color: theme.colors.muted }]}>BẢN CẬP NHẬT ÚNG DỤNG</Text>
+        <View style={[styles.toggleGroup, { backgroundColor: theme.colors.card, marginBottom: 28 }]}>
+          <Pressable
+            style={({ pressed }) => [styles.toggleRow, pressed && { opacity: 0.7 }]}
+            onPress={() => setShowUpdateModal(true)}
+          >
+            <Ionicons name="cloud-download-outline" size={20} color={theme.colors.text} />
+            <Text style={[styles.toggleLabel, { color: theme.colors.text }]}>Kiểm tra cập nhật</Text>
+            {isDownloaded || hasUpdate ? (
+              <View style={styles.updateBadge}>
+                <Text style={styles.updateBadgeText}>Sẵn sàng cập nhật</Text>
+              </View>
+            ) : isChecking ? (
+              <Text style={[styles.statusText, { color: theme.colors.muted }]}>Đang kiểm tra...</Text>
+            ) : (
+              <Text style={[styles.statusText, { color: theme.colors.muted }]}>Phiên bản mới nhất</Text>
+            )}
+            <Ionicons name="chevron-forward" size={18} color={theme.colors.muted} />
+          </Pressable>
+        </View>
+
         {/* Notifications */}
         <Text style={[styles.sectionLabel, { color: theme.colors.muted }]}>{t('settings:notifications')}</Text>
         <View style={[styles.toggleGroup, { backgroundColor: theme.colors.card }]}>
@@ -184,6 +211,11 @@ export default function SettingsScreen() {
           </Pressable>
         </View>
       </ScrollView>
+
+      <UpdateModal
+        visible={showUpdateModal}
+        onClose={() => setShowUpdateModal(false)}
+      />
     </Animated.View>
   );
 }
@@ -244,5 +276,20 @@ const styles = StyleSheet.create({
     width: 50, height: 50, borderRadius: 25,
     borderWidth: 3, borderColor: 'white',
     shadowOpacity: 0.3, shadowRadius: 10, elevation: 8,
+  },
+  updateBadge: {
+    backgroundColor: '#34C759',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  updateBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  statusText: {
+    fontSize: 13,
+    fontWeight: '500',
   },
 });

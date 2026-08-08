@@ -22,6 +22,8 @@ import { AuthProvider, useAuth } from '@/lib/auth/AuthContext';
 import { ThemeProvider } from '@/lib/theme/ThemeContext';
 import { navigateFromNotification } from '@/lib/notifications/device';
 import { fetchGlobalUnread } from '@/lib/notifications/unread';
+import { updateService } from '@/lib/updates/updateService';
+import { UpdateBanner } from '@/components/UpdateBanner';
 
 export const unstable_settings = {
   anchor: '(tabs)',
@@ -89,6 +91,13 @@ function RootNavigator() {
     };
   }, [ready, isAuthenticated, router, pathname]);
 
+  // OTA Check - trigger background check once ready
+  useEffect(() => {
+    if (ready) {
+      updateService.checkAndPreDownloadOTA();
+    }
+  }, [ready]);
+
   // Route gate: chuyển hướng theo trạng thái đăng nhập sau khi bootstrap xong.
   useEffect(() => {
     if (!ready) return;
@@ -113,6 +122,7 @@ function RootNavigator() {
 
   return (
     <NavThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+      <UpdateBanner />
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="(auth)" options={{ headerShown: false }} />

@@ -9,4 +9,9 @@ export default {
   notifications: 'Notifications',
   push: 'Push Notifications',
   email: 'Email Notifications',
+  softwareUpdates: 'Software Updates',
+  checkForUpdates: 'Check for Updates',
+  updateReady: 'Update Ready',
+  upToDate: 'Up to date',
+  checking: 'Checking...',
 };

@@ -9,4 +9,9 @@ export default {
   notifications: 'Thông báo',
   push: 'Thông báo đẩy',
   email: 'Email thông báo',
+  softwareUpdates: 'Bản cập nhật ứng dụng',
+  checkForUpdates: 'Kiểm tra cập nhật',
+  updateReady: 'Sẵn sàng cập nhật',
+  upToDate: 'Phiên bản mới nhất',
+  checking: 'Đang kiểm tra...',
 };

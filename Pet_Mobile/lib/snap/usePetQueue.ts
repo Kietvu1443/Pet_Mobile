@@ -7,8 +7,10 @@
 // Hook chỉ làm việc với model Pet (đã qua adapter) — không bao giờ chạm DTO thô.
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { fetchNextPet, postDislike, postLike } from '../api/petSnap';
+import { superLikeFavorite } from '../api/favorites';
 import { ApiError } from '../api/client';
 import { adaptPet, type Pet } from './adapter';
+import { queryClient } from '../query/queryClient';
 
 type QueueStatus = 'loading' | 'ready' | 'empty' | 'error';
 
@@ -83,16 +85,23 @@ export function usePetQueue() {
     void runFill([]);
   }, [runFill]);
 
-  // Xử lý một hành động (like/dislike) trên thú cưng ở đầu hàng đợi.
+  // Xử lý một hành động (like/dislike/superlike) trên thú cưng ở đầu hàng đợi.
   const act = useCallback(
-    async (petId: number, kind: 'like' | 'dislike') => {
+    async (petId: number, kind: 'like' | 'dislike' | 'superlike') => {
       if (acting) return;
       setActing(true);
       // Lạc quan: bỏ con đang xử lý khỏi hàng đợi ngay.
       const remaining = queue.filter((p) => p.id !== petId);
       setQueue(remaining);
       try {
-        const bundle = kind === 'like' ? await postLike(petId) : await postDislike(petId);
+        let bundle;
+        if (kind === 'superlike') {
+          await superLikeFavorite(petId);
+          bundle = await fetchNextPet();
+        } else {
+          bundle = kind === 'like' ? await postLike(petId) : await postDislike(petId);
+        }
+        queryClient.invalidateQueries({ queryKey: ['favorites'] });
         hasMoreRef.current = bundle.hasMore;
         const base = [...remaining];
         const pet = adaptPet(bundle.pet);
@@ -120,6 +129,7 @@ export function usePetQueue() {
     acting,
     like: (petId: number) => act(petId, 'like'),
     dislike: (petId: number) => act(petId, 'dislike'),
+    superlike: (petId: number) => act(petId, 'superlike'),
     reload,
   };
 }

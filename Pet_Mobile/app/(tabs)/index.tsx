@@ -437,7 +437,7 @@ function ConnectedTab() {
 // ---------------------------------------------------------------------------
 export default function AdoptScreen() {
   const { theme } = useTheme();
-  const { queue, status, errorMsg, acting, like, dislike, reload } = usePetQueue();
+  const { queue, status, errorMsg, acting, like, dislike, superlike, reload } = usePetQueue();
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { t } = useTranslation(['tabs', 'common']);
@@ -458,6 +458,11 @@ export default function AdoptScreen() {
     if (!currentPet || acting) return;
     void dislike(currentPet.id);
   }, [currentPet, acting, dislike]);
+
+  const handleSuperlike = useCallback(() => {
+    if (!currentPet || acting) return;
+    void superlike(currentPet.id);
+  }, [currentPet, acting, superlike]);
 
   const handleDetail = useCallback(() => {
     if (!currentPet) return;
@@ -558,8 +563,8 @@ export default function AdoptScreen() {
                 <Ionicons name="close" size={22} color="#FF4D4F" />
               </ActionBtn>
 
-              <ActionBtn onPress={() => {}} size={62} shadow="#3A7AFE" badge="3" disabled={acting}>
-                <Ionicons name="star" size={26} color="#3A7AFE" />
+              <ActionBtn onPress={handleSuperlike} size={62} shadow="#FFB800" disabled={acting}>
+                <Ionicons name="star" size={26} color="#FFB800" />
               </ActionBtn>
 
               {/* Primary like button — larger, pink gradient */}

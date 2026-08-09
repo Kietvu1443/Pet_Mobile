@@ -12,70 +12,98 @@ const THROTTLE_MS = 6 * 60 * 60 * 1000; // 6 hours throttle
 
 export const updateService = {
   /**
+   * Fetch latest update metadata (changelog, version, etc.) from backend.
+   */
+  async fetchBackendUpdateInfo(): Promise<OTAUpdateInfo | null> {
+    try {
+      const runtimeVersion = Updates.runtimeVersion || '1.0.0';
+      const channel = Updates.channel || 'production';
+      const res = await fetch(
+        `${API_BASE_URL}/app/latest-update?channel=${encodeURIComponent(channel)}&runtimeVersion=${encodeURIComponent(runtimeVersion)}`
+      );
+      if (res.ok) {
+        const json = await res.json();
+        if (json.success && json.data) {
+          return json.data;
+        }
+      }
+    } catch (e) {
+      console.warn('[updateService] fetchBackendUpdateInfo error:', e);
+    }
+    return null;
+  },
+
+  /**
    * Check for OTA updates with 6h throttle and background pre-download.
    */
-  async checkAndPreDownloadOTA(): Promise<void> {
+  async checkAndPreDownloadOTA(force: boolean = false): Promise<void> {
     // Stale-While-Revalidate: If already pre-downloaded in memory, skip network check
-    if (otaStore.getState().isDownloaded) {
+    if (otaStore.getState().isDownloaded && !force) {
       return;
     }
 
-    // Check throttle with AsyncStorage
-    try {
-      const lastCheckedStr = await AsyncStorage.getItem(STORAGE_KEYS.LAST_CHECKED_AT);
-      if (lastCheckedStr) {
-        const lastChecked = parseInt(lastCheckedStr, 10);
-        if (!isNaN(lastChecked) && Date.now() - lastChecked < THROTTLE_MS) {
-          return;
+    // Check throttle with AsyncStorage unless force is requested
+    if (!force) {
+      try {
+        const lastCheckedStr = await AsyncStorage.getItem(STORAGE_KEYS.LAST_CHECKED_AT);
+        if (lastCheckedStr) {
+          const lastChecked = parseInt(lastCheckedStr, 10);
+          if (!isNaN(lastChecked) && Date.now() - lastChecked < THROTTLE_MS) {
+            return;
+          }
         }
+      } catch {
+        // Ignore storage read errors and proceed to check
       }
-    } catch {
-      // Ignore storage read errors and proceed to check
     }
 
     otaStore.setState({ isChecking: true, error: null });
 
     try {
-      // In development mode without updates enabled, expo-updates returns isAvailable=false or throws.
+      // Fetch backend changelog info
+      const backendInfo = await this.fetchBackendUpdateInfo();
+
+      // In development mode, simulate download flow and set update info so reload can be tested
       if (__DEV__) {
-        otaStore.setState({ isChecking: false });
+        if (force && !otaStore.getState().isDownloaded) {
+          otaStore.setState({ isDownloading: true });
+          await new Promise((resolve) => setTimeout(resolve, 800));
+        }
+        otaStore.setState({
+          isChecking: false,
+          isDownloading: false,
+          isDownloaded: true,
+          hasUpdate: !!backendInfo,
+          updateInfo: backendInfo,
+        });
         return;
       }
 
-      const updateCheck = await Updates.checkForUpdateAsync();
-      if (!updateCheck.isAvailable) {
-        otaStore.setState({ isChecking: false, hasUpdate: false });
-        return;
-      }
+      let updateAvailable = false;
+      let isFetched = false;
+      let manifestId = 'ota-update';
 
-      otaStore.setState({ isDownloading: true, hasUpdate: true });
+      try {
+        const updateCheck = await Updates.checkForUpdateAsync();
+        if (updateCheck.isAvailable) {
+          updateAvailable = true;
+          otaStore.setState({ isDownloading: true, hasUpdate: true });
+          const fetchResult = await Updates.fetchUpdateAsync();
+          isFetched = !!fetchResult;
+          if (fetchResult?.manifest?.id) {
+            manifestId = fetchResult.manifest.id;
+          }
+        }
+      } catch (err) {
+        console.warn('[updateService] Expo Updates check failed:', err);
+      }
 
       const runtimeVersion = Updates.runtimeVersion || '1.0.0';
       const channel = Updates.channel || 'production';
 
-      // Concurrent pre-download of JS bundle & backend changelog API fetch
-      const [fetchResult, changelogRes] = await Promise.allSettled([
-        Updates.fetchUpdateAsync(),
-        fetch(`${API_BASE_URL}/app/latest-update?channel=${encodeURIComponent(channel)}&runtimeVersion=${encodeURIComponent(runtimeVersion)}`),
-      ]);
-
-      const isFetched = fetchResult.status === 'fulfilled';
-      let backendInfo: OTAUpdateInfo | null = null;
-
-      if (changelogRes.status === 'fulfilled' && changelogRes.value.ok) {
-        try {
-          const json = await changelogRes.value.json();
-          if (json.success && json.data) {
-            backendInfo = json.data;
-          }
-        } catch {
-          // Ignore JSON parse failure
-        }
-      }
-
       const fallbackInfo: OTAUpdateInfo = backendInfo || {
         version: 'Mới nhất',
-        updateGroup: fetchResult.status === 'fulfilled' && fetchResult.value?.manifest?.id ? fetchResult.value.manifest.id : 'ota-update',
+        updateGroup: manifestId,
         runtimeVersion: String(runtimeVersion),
         channel: String(channel),
         releaseDate: new Date().toISOString().split('T')[0],
@@ -86,8 +114,8 @@ export const updateService = {
       otaStore.setState({
         isChecking: false,
         isDownloading: false,
-        isDownloaded: isFetched,
-        hasUpdate: true,
+        isDownloaded: isFetched || !!backendInfo,
+        hasUpdate: updateAvailable || !!backendInfo,
         updateInfo: fallbackInfo,
       });
     } catch (error: any) {
@@ -146,6 +174,13 @@ export const updateService = {
     });
 
     try {
+      if (__DEV__) {
+        const { DevSettings } = require('react-native');
+        if (DevSettings && typeof DevSettings.reload === 'function') {
+          DevSettings.reload();
+          return;
+        }
+      }
       await Updates.reloadAsync();
     } catch (err) {
       console.error('[updateService] reloadAsync error:', err);

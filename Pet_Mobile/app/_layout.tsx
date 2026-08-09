@@ -25,6 +25,9 @@ import { fetchGlobalUnread } from '@/lib/notifications/unread';
 import { updateService } from '@/lib/updates/updateService';
 import { UpdateBanner } from '@/components/UpdateBanner';
 
+import { QueryClientProvider } from '@tanstack/react-query';
+import { queryClient } from '@/lib/query/queryClient';
+
 export const unstable_settings = {
   anchor: '(tabs)',
 };
@@ -42,13 +45,15 @@ Notifications.setNotificationHandler({
 export default function RootLayout() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      <SafeAreaProvider>
-        <ThemeProvider>
-          <AuthProvider>
-            <RootNavigator />
-          </AuthProvider>
-        </ThemeProvider>
-      </SafeAreaProvider>
+      <QueryClientProvider client={queryClient}>
+        <SafeAreaProvider>
+          <ThemeProvider>
+            <AuthProvider>
+              <RootNavigator />
+            </AuthProvider>
+          </ThemeProvider>
+        </SafeAreaProvider>
+      </QueryClientProvider>
     </GestureHandlerRootView>
   );
 }
@@ -79,6 +84,11 @@ function RootNavigator() {
     });
 
     const tapSub = Notifications.addNotificationResponseReceivedListener((response) => {
+      const petId = response.notification.request.content.data?.petId as number | string | undefined;
+      if (petId) {
+        router.push({ pathname: '/pet-detail', params: { petId: String(petId) } });
+        return;
+      }
       const type = response.notification.request.content.data?.type as string | undefined;
       if (type) {
         navigateFromNotification(type, router, pathname);

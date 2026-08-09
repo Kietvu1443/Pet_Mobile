@@ -15,6 +15,13 @@ export type RawFavorite = {
   id: number;
   name?: string | null;
   image?: string | null;
+  breed?: string | null;
+  age?: string | null;
+  gender?: string | null;
+  pet_type?: string | null;
+  vaccination?: string | null;
+  liked_at?: string | null;
+  location?: string | null;
 };
 
 export type MyFavoritesResponse = {
@@ -24,4 +31,30 @@ export type MyFavoritesResponse = {
 
 export function fetchMyFavorites(signal?: AbortSignal): Promise<MyFavoritesResponse> {
   return apiRequest<MyFavoritesResponse>('/favorites/my', { signal });
+}
+
+export function fetchMyPassed(signal?: AbortSignal): Promise<MyFavoritesResponse> {
+  return apiRequest<MyFavoritesResponse>('/favorites/passed', { signal });
+}
+
+export function fetchMySuperliked(signal?: AbortSignal): Promise<MyFavoritesResponse> {
+  return apiRequest<MyFavoritesResponse>('/favorites/superliked', { signal });
+}
+
+export function removeFavorite(petId: number): Promise<{ petId: number; isLiked: boolean }> {
+  return apiRequest<{ petId: number; isLiked: boolean }>(`/favorites/${petId}`, {
+    method: 'DELETE',
+  });
+}
+
+export function restoreFavorite(petId: number): Promise<{ petId: number; isLiked: boolean }> {
+  return apiRequest<{ petId: number; isLiked: boolean }>(`/favorites/${petId}/restore`, {
+    method: 'PUT',
+  });
+}
+
+export function superLikeFavorite(petId: number): Promise<{ petId: number; isLiked: boolean; isSuperliked: boolean }> {
+  return apiRequest<{ petId: number; isLiked: boolean; isSuperliked: boolean }>(`/favorites/${petId}/superlike`, {
+    method: 'PUT',
+  });
 }

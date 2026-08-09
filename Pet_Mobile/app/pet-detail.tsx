@@ -28,11 +28,17 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 
+import { useQuery } from '@tanstack/react-query';
+
 import { useTheme } from '@/lib/theme/ThemeContext';
 import { apiRequest } from '@/lib/api/client';
 import { adaptPet } from '@/lib/snap/adapter';
 import type { RawPet } from '@/lib/api/petSnap';
 import { resolveImageUrl } from '@/lib/images/resolveUrl';
+import { PetNoteModal } from '@/components/PetNoteModal';
+import { PetReminderModal } from '@/components/PetReminderModal';
+import { fetchPetNote } from '@/lib/api/notes';
+import { getPetReminder } from '@/lib/notifications/reminders';
 import {
   computeVerified,
   getMockTraits,
@@ -58,6 +64,31 @@ export default function PetDetailScreen() {
   const [liked, setLiked] = useState(false);
   const [showFullDesc, setShowFullDesc] = useState(false);
   const [applied, setApplied] = useState(false);
+  const [showNoteModal, setShowNoteModal] = useState(false);
+  const [showReminderModal, setShowReminderModal] = useState(false);
+
+  const petNoteQuery = useQuery({
+    queryKey: ['note', rawPet?.id],
+    queryFn: async () => {
+      if (!rawPet?.id) return null;
+      const res = await fetchPetNote(rawPet.id);
+      return res.note;
+    },
+    enabled: Boolean(rawPet?.id),
+  });
+
+  const noteContent = petNoteQuery.data?.content || null;
+
+  const petReminderQuery = useQuery({
+    queryKey: ['reminder', rawPet?.id],
+    queryFn: async () => {
+      if (!rawPet?.id) return null;
+      return await getPetReminder(rawPet.id);
+    },
+    enabled: Boolean(rawPet?.id),
+  });
+
+  const petReminder = petReminderQuery.data;
 
   useEffect(() => {
     let alive = true;
@@ -310,6 +341,78 @@ export default function PetDetailScreen() {
             </View>
           )}
 
+          {/* Personal Note Card */}
+          <View style={{ marginBottom: 24 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+              <Text style={[styles.sectionTitle, { color: theme.colors.text, marginBottom: 0 }]}>Ghi chú cá nhân</Text>
+              <Pressable
+                style={({ pressed }) => [
+                  styles.editNoteBtn,
+                  { backgroundColor: `${theme.colors.primary}18`, borderColor: theme.colors.primary },
+                  pressed && { opacity: 0.8 },
+                ]}
+                onPress={() => setShowNoteModal(true)}
+              >
+                <Ionicons name="create-outline" size={13} color={theme.colors.primary} />
+                <Text style={[styles.editNoteBtnText, { color: theme.colors.primary }]}>
+                  {noteContent ? 'Chỉnh sửa' : '+ Thêm ghi chú'}
+                </Text>
+              </Pressable>
+            </View>
+
+            <View style={[styles.noteCard, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}>
+              {noteContent ? (
+                <Text style={[styles.noteContentText, { color: theme.colors.text }]}>
+                  {noteContent}
+                </Text>
+              ) : (
+                <Text style={[styles.emptyNoteText, { color: theme.colors.muted }]}>
+                  {'Chưa có ghi chú cá nhân cho bé này. Bấm "+ Thêm ghi chú" để lưu lại thông tin cần nhớ nhé!'}
+                </Text>
+              )}
+            </View>
+          </View>
+
+          {/* Pet Reminder Card */}
+          <View style={{ marginBottom: 24 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+              <Text style={[styles.sectionTitle, { color: theme.colors.text, marginBottom: 0 }]}>Lời nhắc quay lại</Text>
+              <Pressable
+                style={({ pressed }) => [
+                  styles.editNoteBtn,
+                  { backgroundColor: `${theme.colors.primary}18`, borderColor: theme.colors.primary },
+                  pressed && { opacity: 0.8 },
+                ]}
+                onPress={() => setShowReminderModal(true)}
+              >
+                <Ionicons name="notifications-outline" size={13} color={theme.colors.primary} />
+                <Text style={[styles.editNoteBtnText, { color: theme.colors.primary }]}>
+                  {petReminder ? 'Đổi giờ' : '+ Đặt lời nhắc'}
+                </Text>
+              </Pressable>
+            </View>
+
+            <View style={[styles.noteCard, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}>
+              {petReminder ? (
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                  <Ionicons name="alarm" size={24} color={theme.colors.primary} />
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontSize: 14, fontWeight: '700', color: theme.colors.text }}>
+                      Đã hẹn giờ: {new Date(petReminder.remindAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
+                    </Text>
+                    <Text style={{ fontSize: 12, color: theme.colors.muted, marginTop: 2 }}>
+                      Ngày {new Date(petReminder.remindAt).toLocaleDateString('vi-VN')}
+                    </Text>
+                  </View>
+                </View>
+              ) : (
+                <Text style={[styles.emptyNoteText, { color: theme.colors.muted }]}>
+                  {'Chưa đặt lời nhắc cho bé này. Bấm "+ Đặt lời nhắc" để ứng dụng gửi thông báo hẹn giờ nhé!'}
+                </Text>
+              )}
+            </View>
+          </View>
+
           {/* Report */}
           <Pressable style={styles.reportBtn}>
             <Text style={[styles.reportBtnText, { color: theme.colors.muted }]}>⚑ Báo cáo tin đăng này</Text>
@@ -334,6 +437,22 @@ export default function PetDetailScreen() {
           </Text>
         </Pressable>
       </View>
+
+      {/* Pet Note Modal */}
+      <PetNoteModal
+        visible={showNoteModal}
+        petId={rawPet ? rawPet.id : null}
+        petName={pet.name}
+        onClose={() => setShowNoteModal(false)}
+      />
+
+      {/* Pet Reminder Modal */}
+      <PetReminderModal
+        visible={showReminderModal}
+        petId={rawPet ? rawPet.id : null}
+        petName={pet.name}
+        onClose={() => setShowReminderModal(false)}
+      />
     </View>
   );
 }
@@ -420,6 +539,28 @@ const styles = StyleSheet.create({
   traitChipText: { color: '#FF4FA3', fontSize: 13, fontWeight: '600' },
   // Description
   sectionTitle: { fontSize: 18, fontWeight: '700', color: '#1A1A1A', marginBottom: 10 },
+  editNoteBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    borderRadius: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderWidth: 1,
+  },
+  editNoteBtnText: { fontSize: 12, fontWeight: '700' },
+  noteCard: {
+    borderRadius: 18,
+    padding: 16,
+    borderWidth: 1,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  noteContentText: { fontSize: 14, lineHeight: 22, fontWeight: '500' },
+  emptyNoteText: { fontSize: 13, lineHeight: 20, fontStyle: 'italic' },
   descText: { fontSize: 15, color: '#555', lineHeight: 24 },
   readMoreText: { color: '#FF4FA3', fontSize: 14, fontWeight: '600', paddingTop: 6 },
   // Health

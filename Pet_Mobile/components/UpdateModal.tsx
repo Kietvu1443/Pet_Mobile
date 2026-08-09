@@ -25,11 +25,17 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({ visible, onClose }) =>
   const { theme } = useTheme();
   const { t } = useTranslation();
 
+  React.useEffect(() => {
+    if (visible) {
+      updateService.checkAndPreDownloadOTA(true);
+    }
+  }, [visible]);
+
   const handleApply = () => {
     if (isDownloaded) {
       updateService.applyOTAUpdate();
     } else {
-      updateService.checkAndPreDownloadOTA();
+      updateService.checkAndPreDownloadOTA(true);
     }
   };
 

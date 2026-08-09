@@ -19,6 +19,7 @@ import { useTranslation } from 'react-i18next';
 import { setLanguage, type Language, ACCENT_COLORS, type AccentColorKey, type ThemeMode } from '@/lib/storage/settingsStore';
 import { notifyThemeChange } from '@/hooks/use-color-scheme';
 import { useOTAStore } from '@/lib/updates/otaStore';
+import { updateService } from '@/lib/updates/updateService';
 import { UpdateModal } from '@/components/UpdateModal';
 
 const LANGUAGES: { id: Language; label: Record<string, string> }[] = [
@@ -168,7 +169,10 @@ export default function SettingsScreen() {
         <View style={[styles.toggleGroup, { backgroundColor: theme.colors.card, marginBottom: 28 }]}>
           <Pressable
             style={({ pressed }) => [styles.toggleRow, pressed && { opacity: 0.7 }]}
-            onPress={() => setShowUpdateModal(true)}
+            onPress={() => {
+              updateService.checkAndPreDownloadOTA(true);
+              setShowUpdateModal(true);
+            }}
           >
             <Ionicons name="cloud-download-outline" size={20} color={theme.colors.text} />
             <Text style={[styles.toggleLabel, { color: theme.colors.text }]}>Kiểm tra cập nhật</Text>

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Modal,
@@ -7,17 +7,17 @@ import {
   Text,
   TextInput,
   View,
-} from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+} from "react-native";
+import { Ionicons } from "@expo/vector-icons";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
 import {
   fetchPetNote,
   savePetNote,
   deletePetNote,
   type RawPetNote,
-} from '@/lib/api/notes';
-import { useTheme } from '@/lib/theme/ThemeContext';
+} from "@/lib/api/notes";
+import { useTheme } from "@/lib/theme/ThemeContext";
 
 const MAX_NOTE_LENGTH = 500;
 
@@ -35,7 +35,7 @@ export function PetNoteModal({
   const { theme } = useTheme();
   const queryClient = useQueryClient();
 
-  const [content, setContent] = useState('');
+  const [content, setContent] = useState("");
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   const showToast = (msg: string) => {
@@ -47,7 +47,7 @@ export function PetNoteModal({
 
   // Fetch note
   const noteQuery = useQuery({
-    queryKey: ['note', petId],
+    queryKey: ["note", petId],
     queryFn: async () => {
       if (!petId) return null;
       const res = await fetchPetNote(petId);
@@ -59,7 +59,7 @@ export function PetNoteModal({
   // Sync state when query data changes
   useEffect(() => {
     if (noteQuery.data !== undefined) {
-      setContent(noteQuery.data?.content || '');
+      setContent(noteQuery.data?.content || "");
     }
   }, [noteQuery.data]);
 
@@ -71,8 +71,11 @@ export function PetNoteModal({
       return res.note;
     },
     onMutate: async (newContent) => {
-      await queryClient.cancelQueries({ queryKey: ['note', petId] });
-      const previousNote = queryClient.getQueryData<RawPetNote | null>(['note', petId]);
+      await queryClient.cancelQueries({ queryKey: ["note", petId] });
+      const previousNote = queryClient.getQueryData<RawPetNote | null>([
+        "note",
+        petId,
+      ]);
 
       const optimisticNote: RawPetNote = {
         id: previousNote?.id || Date.now(),
@@ -83,21 +86,21 @@ export function PetNoteModal({
         updated_at: new Date().toISOString(),
       };
 
-      queryClient.setQueryData(['note', petId], optimisticNote);
+      queryClient.setQueryData(["note", petId], optimisticNote);
       return { previousNote };
     },
     onError: (_err, _newContent, context) => {
       if (context) {
-        queryClient.setQueryData(['note', petId], context.previousNote);
+        queryClient.setQueryData(["note", petId], context.previousNote);
       }
-      showToast('Không thể lưu ghi chú, vui lòng thử lại');
+      showToast("Không thể lưu ghi chú, vui lòng thử lại");
     },
     onSuccess: () => {
-      showToast('Đã lưu ghi chú thành công!');
+      showToast("Đã lưu ghi chú thành công!");
     },
     onSettled: () => {
-      void queryClient.invalidateQueries({ queryKey: ['note', petId] });
-      void queryClient.invalidateQueries({ queryKey: ['favorites'] });
+      void queryClient.invalidateQueries({ queryKey: ["note", petId] });
+      void queryClient.invalidateQueries({ queryKey: ["favorites"] });
     },
   });
 
@@ -108,24 +111,27 @@ export function PetNoteModal({
       await deletePetNote(petId);
     },
     onMutate: async () => {
-      await queryClient.cancelQueries({ queryKey: ['note', petId] });
-      const previousNote = queryClient.getQueryData<RawPetNote | null>(['note', petId]);
-      queryClient.setQueryData(['note', petId], null);
+      await queryClient.cancelQueries({ queryKey: ["note", petId] });
+      const previousNote = queryClient.getQueryData<RawPetNote | null>([
+        "note",
+        petId,
+      ]);
+      queryClient.setQueryData(["note", petId], null);
       return { previousNote };
     },
     onError: (_err, _vars, context) => {
       if (context) {
-        queryClient.setQueryData(['note', petId], context.previousNote);
+        queryClient.setQueryData(["note", petId], context.previousNote);
       }
-      showToast('Không thể xóa ghi chú');
+      showToast("Không thể xóa ghi chú");
     },
     onSuccess: () => {
-      setContent('');
-      showToast('Đã xóa ghi chú!');
+      setContent("");
+      showToast("Đã xóa ghi chú!");
     },
     onSettled: () => {
-      void queryClient.invalidateQueries({ queryKey: ['note', petId] });
-      void queryClient.invalidateQueries({ queryKey: ['favorites'] });
+      void queryClient.invalidateQueries({ queryKey: ["note", petId] });
+      void queryClient.invalidateQueries({ queryKey: ["favorites"] });
     },
   });
 
@@ -136,23 +142,46 @@ export function PetNoteModal({
   const hasExistingNote = Boolean(noteQuery.data?.content);
 
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+    <Modal
+      visible={visible}
+      transparent
+      animationType="slide"
+      onRequestClose={onClose}
+    >
       <Pressable style={styles.overlay} onPress={onClose}>
         <Pressable
           style={[
             styles.sheet,
-            { backgroundColor: theme.colors.card, borderColor: theme.colors.border },
+            {
+              backgroundColor: theme.colors.card,
+              borderColor: theme.colors.border,
+            },
           ]}
           onPress={(e) => e.stopPropagation()}
         >
           {/* Header */}
           <View style={styles.header}>
-            <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-              <Ionicons name="create-outline" size={22} color={theme.colors.primary} />
+            <View
+              style={{
+                flex: 1,
+                flexDirection: "row",
+                alignItems: "center",
+                gap: 8,
+              }}
+            >
+              <Ionicons
+                name="create-outline"
+                size={22}
+                color={theme.colors.primary}
+              />
               <View>
-                <Text style={[styles.title, { color: theme.colors.text }]}>Ghi chú cá nhân</Text>
+                <Text style={[styles.title, { color: theme.colors.text }]}>
+                  Ghi chú cá nhân
+                </Text>
                 {petName ? (
-                  <Text style={[styles.subtitle, { color: theme.colors.muted }]}>
+                  <Text
+                    style={[styles.subtitle, { color: theme.colors.muted }]}
+                  >
                     Dành riêng cho {petName}
                   </Text>
                 ) : null}
@@ -168,17 +197,29 @@ export function PetNoteModal({
             <View
               style={[
                 styles.toastBanner,
-                { backgroundColor: `${theme.colors.primary}18`, borderColor: theme.colors.primary },
+                {
+                  backgroundColor: `${theme.colors.primary}18`,
+                  borderColor: theme.colors.primary,
+                },
               ]}
             >
-              <Ionicons name="checkmark-circle" size={16} color={theme.colors.primary} />
-              <Text style={[styles.toastText, { color: theme.colors.primary }]}>{toastMessage}</Text>
+              <Ionicons
+                name="checkmark-circle"
+                size={16}
+                color={theme.colors.primary}
+              />
+              <Text style={[styles.toastText, { color: theme.colors.primary }]}>
+                {toastMessage}
+              </Text>
             </View>
           ) : null}
 
           {/* Editor Body */}
           {noteQuery.isLoading ? (
-            <ActivityIndicator style={{ marginVertical: 30 }} color={theme.colors.primary} />
+            <ActivityIndicator
+              style={{ marginVertical: 30 }}
+              color={theme.colors.primary}
+            />
           ) : (
             <View>
               <TextInput
@@ -187,7 +228,9 @@ export function PetNoteModal({
                   {
                     color: theme.colors.text,
                     backgroundColor: theme.colors.surface,
-                    borderColor: isOverLimit ? theme.colors.notification : theme.colors.border,
+                    borderColor: isOverLimit
+                      ? theme.colors.notification
+                      : theme.colors.border,
                   },
                 ]}
                 placeholder="Ví dụ: Gọi chủ vào buổi tối, bé thích ăn cá sấy, nhà gần trường học..."
@@ -205,7 +248,11 @@ export function PetNoteModal({
                 <Text
                   style={[
                     styles.counterText,
-                    { color: isOverLimit ? theme.colors.notification : theme.colors.muted },
+                    {
+                      color: isOverLimit
+                        ? theme.colors.notification
+                        : theme.colors.muted,
+                    },
                   ]}
                 >
                   {remainingChars >= 0
@@ -226,8 +273,17 @@ export function PetNoteModal({
                     onPress={() => deleteMutation.mutate()}
                     disabled={deleteMutation.isPending}
                   >
-                    <Ionicons name="trash-outline" size={16} color={theme.colors.notification} />
-                    <Text style={[styles.deleteBtnText, { color: theme.colors.notification }]}>
+                    <Ionicons
+                      name="trash-outline"
+                      size={16}
+                      color={theme.colors.notification}
+                    />
+                    <Text
+                      style={[
+                        styles.deleteBtnText,
+                        { color: theme.colors.notification },
+                      ]}
+                    >
                       Xóa
                     </Text>
                   </Pressable>
@@ -236,7 +292,14 @@ export function PetNoteModal({
                 <View style={{ flex: 1 }} />
 
                 <Pressable style={styles.cancelBtn} onPress={onClose}>
-                  <Text style={[styles.cancelBtnText, { color: theme.colors.muted }]}>Hủy</Text>
+                  <Text
+                    style={[
+                      styles.cancelBtnText,
+                      { color: theme.colors.muted },
+                    ]}
+                  >
+                    Hủy
+                  </Text>
                 </Pressable>
 
                 <Pressable
@@ -250,7 +313,7 @@ export function PetNoteModal({
                   disabled={saveMutation.isPending || isOverLimit}
                 >
                   <Text style={styles.saveBtnText}>
-                    {saveMutation.isPending ? 'Đang lưu...' : 'Lưu ghi chú'}
+                    {saveMutation.isPending ? "Đang lưu..." : "Lưu ghi chú"}
                   </Text>
                 </Pressable>
               </View>
@@ -265,8 +328,8 @@ export function PetNoteModal({
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.45)',
-    justifyContent: 'flex-end',
+    backgroundColor: "rgba(0,0,0,0.45)",
+    justifyContent: "flex-end",
   },
   sheet: {
     borderTopLeftRadius: 28,
@@ -274,23 +337,23 @@ const styles = StyleSheet.create({
     padding: 24,
     borderWidth: 1,
     borderBottomWidth: 0,
-    shadowColor: '#000',
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: -4 },
     shadowOpacity: 0.12,
     shadowRadius: 16,
     elevation: 10,
   },
   header: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     marginBottom: 16,
   },
-  title: { fontSize: 18, fontWeight: '800' },
+  title: { fontSize: 18, fontWeight: "800" },
   subtitle: { fontSize: 13, marginTop: 2 },
   closeBtn: { padding: 4 },
   toastBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 8,
     borderRadius: 12,
     paddingHorizontal: 12,
@@ -298,7 +361,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     marginBottom: 14,
   },
-  toastText: { fontSize: 13, fontWeight: '700', flex: 1 },
+  toastText: { fontSize: 13, fontWeight: "700", flex: 1 },
   textArea: {
     borderRadius: 16,
     borderWidth: 1,
@@ -306,39 +369,39 @@ const styles = StyleSheet.create({
     minHeight: 110,
     maxHeight: 160,
     fontSize: 14,
-    textAlignVertical: 'top',
+    textAlignVertical: "top",
     lineHeight: 20,
   },
   counterRow: {
-    alignItems: 'flex-end',
+    alignItems: "flex-end",
     marginTop: 6,
     marginBottom: 16,
   },
-  counterText: { fontSize: 12, fontWeight: '600' },
+  counterText: { fontSize: 12, fontWeight: "600" },
   actionsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 12,
   },
   deleteBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 4,
     paddingVertical: 8,
     paddingHorizontal: 10,
   },
-  deleteBtnText: { fontSize: 13, fontWeight: '700' },
+  deleteBtnText: { fontSize: 13, fontWeight: "700" },
   cancelBtn: {
     paddingVertical: 10,
     paddingHorizontal: 14,
   },
-  cancelBtnText: { fontSize: 14, fontWeight: '600' },
+  cancelBtnText: { fontSize: 14, fontWeight: "600" },
   saveBtn: {
     borderRadius: 14,
     paddingHorizontal: 20,
     paddingVertical: 11,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
-  saveBtnText: { color: 'white', fontSize: 14, fontWeight: '700' },
+  saveBtnText: { color: "white", fontSize: 14, fontWeight: "700" },
 });

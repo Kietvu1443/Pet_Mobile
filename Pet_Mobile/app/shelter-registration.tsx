@@ -1,5 +1,5 @@
-import { useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useRouter } from "expo-router";
+import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -11,22 +11,55 @@ import {
   Text,
   TextInput,
   View,
-} from 'react-native';
-import Animated from 'react-native-reanimated';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
+} from "react-native";
+import Animated from "react-native-reanimated";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { Ionicons } from "@expo/vector-icons";
 
-import { apiRequest } from '@/lib/api/client';
-import { useAuth } from '@/lib/auth/AuthContext';
-import { useTheme } from '@/lib/theme/ThemeContext';
+import { apiRequest } from "@/lib/api/client";
+import { useAuth } from "@/lib/auth/AuthContext";
+import { useTheme } from "@/lib/theme/ThemeContext";
 
-type ShelterStatus = 'unsubmitted' | 'pending' | 'approved' | 'rejected';
+type ShelterStatus = "unsubmitted" | "pending" | "approved" | "rejected";
 
-const STATUS_LABEL: Record<ShelterStatus, { label: string; bg: string; border: string; text: string; icon: keyof typeof Ionicons.glyphMap }> = {
-  unsubmitted: { label: 'Chưa gửi', bg: '#F5F5F5', border: '#E0E0E0', text: '#888', icon: 'time-outline' },
-  pending: { label: 'Chờ duyệt', bg: '#FFF8E8', border: '#FFD699', text: '#B8860B', icon: 'hourglass-outline' },
-  approved: { label: 'Đã duyệt', bg: '#E8F8EE', border: '#A8E6C1', text: '#34C759', icon: 'checkmark-circle-outline' },
-  rejected: { label: 'Bị từ chối', bg: '#FFF0F0', border: '#FFC0C0', text: '#FF4D4F', icon: 'close-circle-outline' },
+const STATUS_LABEL: Record<
+  ShelterStatus,
+  {
+    label: string;
+    bg: string;
+    border: string;
+    text: string;
+    icon: keyof typeof Ionicons.glyphMap;
+  }
+> = {
+  unsubmitted: {
+    label: "Chưa gửi",
+    bg: "#F5F5F5",
+    border: "#E0E0E0",
+    text: "#888",
+    icon: "time-outline",
+  },
+  pending: {
+    label: "Chờ duyệt",
+    bg: "#FFF8E8",
+    border: "#FFD699",
+    text: "#B8860B",
+    icon: "hourglass-outline",
+  },
+  approved: {
+    label: "Đã duyệt",
+    bg: "#E8F8EE",
+    border: "#A8E6C1",
+    text: "#34C759",
+    icon: "checkmark-circle-outline",
+  },
+  rejected: {
+    label: "Bị từ chối",
+    bg: "#FFF0F0",
+    border: "#FFC0C0",
+    text: "#FF4D4F",
+    icon: "close-circle-outline",
+  },
 };
 
 type ShelterData = {
@@ -47,31 +80,38 @@ export default function ShelterRegistrationScreen() {
 
   const [loading, setLoading] = useState(true);
   const [existingId, setExistingId] = useState<number | null>(null);
-  const [shelterStatus, setShelterStatus] = useState<ShelterStatus>('unsubmitted');
+  const [shelterStatus, setShelterStatus] =
+    useState<ShelterStatus>("unsubmitted");
   const [adminNotes, setAdminNotes] = useState<string | null>(null);
 
-  const [name, setName] = useState('');
-  const [phone, setPhone] = useState('');
-  const [address, setAddress] = useState('');
-  const [description, setDescription] = useState('');
+  const [name, setName] = useState("");
+  const [phone, setPhone] = useState("");
+  const [address, setAddress] = useState("");
+  const [description, setDescription] = useState("");
   const [saving, setSaving] = useState(false);
 
-  const isEditable = shelterStatus === 'unsubmitted' || shelterStatus === 'rejected';
-  const canSave = name.trim().length > 0 && phone.trim().length > 0 && address.trim().length > 0;
+  const isEditable =
+    shelterStatus === "unsubmitted" || shelterStatus === "rejected";
+  const canSave =
+    name.trim().length > 0 &&
+    phone.trim().length > 0 &&
+    address.trim().length > 0;
 
   useEffect(() => {
     (async () => {
       try {
-        const data = await apiRequest<{ shelter: ShelterData | null }>('/shelters');
+        const data = await apiRequest<{ shelter: ShelterData | null }>(
+          "/shelters",
+        );
         const shelter = data.shelter;
         if (shelter) {
           setExistingId(shelter.id);
           setShelterStatus(shelter.status as ShelterStatus);
           setAdminNotes(shelter.admin_notes);
-          setName(shelter.name || '');
-          setPhone(shelter.phone || '');
-          setAddress(shelter.address || '');
-          setDescription(shelter.description || '');
+          setName(shelter.name || "");
+          setPhone(shelter.phone || "");
+          setAddress(shelter.address || "");
+          setDescription(shelter.description || "");
         }
       } catch {
         // No shelter exists — show empty form
@@ -85,18 +125,26 @@ export default function ShelterRegistrationScreen() {
     if (saving || !canSave || !isEditable) return;
     setSaving(true);
     try {
-      const body = { name: name.trim(), phone: phone.trim(), address: address.trim(), description: description.trim() || null };
+      const body = {
+        name: name.trim(),
+        phone: phone.trim(),
+        address: address.trim(),
+        description: description.trim() || null,
+      };
 
-      if (existingId && shelterStatus === 'rejected') {
-        await apiRequest(`/shelters`, { method: 'PATCH', body });
+      if (existingId && shelterStatus === "rejected") {
+        await apiRequest(`/shelters`, { method: "PATCH", body });
       } else {
-        await apiRequest('/shelters', { method: 'POST', body });
+        await apiRequest("/shelters", { method: "POST", body });
       }
 
       await refreshUser();
       router.back();
     } catch (e) {
-      Alert.alert('Lỗi', e instanceof Error ? e.message : 'Không thể lưu thông tin trại');
+      Alert.alert(
+        "Lỗi",
+        e instanceof Error ? e.message : "Không thể lưu thông tin trại",
+      );
     } finally {
       setSaving(false);
     }
@@ -106,153 +154,347 @@ export default function ShelterRegistrationScreen() {
 
   if (loading) {
     return (
-      <View style={[styles.screen, { paddingTop: insets.top, alignItems: 'center', justifyContent: 'center' }]}>
+      <View
+        style={[
+          styles.screen,
+          {
+            paddingTop: insets.top,
+            alignItems: "center",
+            justifyContent: "center",
+          },
+        ]}
+      >
         <ActivityIndicator size="large" color="#FF4FA3" />
       </View>
     );
   }
 
   return (
-    <Animated.View style={[styles.screen, { backgroundColor: theme.colors.background, paddingTop: insets.top }]}>
+    <Animated.View
+      style={[
+        styles.screen,
+        { backgroundColor: theme.colors.background, paddingTop: insets.top },
+      ]}
+    >
       <KeyboardAvoidingView
         style={{ flex: 1 }}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
       >
-      <ScrollView
-        style={styles.scroll}
-        contentContainerStyle={styles.scrollContent}
-        keyboardShouldPersistTaps="handled"
-        keyboardDismissMode="interactive"
-        showsVerticalScrollIndicator={false}
-      >
-        {/* Header */}
-        <View style={styles.header}>
-          <Pressable
-            style={({ pressed }) => [styles.backBtn, { backgroundColor: theme.colors.card }, pressed && { opacity: 0.7 }]}
-            onPress={() => router.back()}
-          >
-            <Ionicons name="chevron-back" size={20} color={theme.colors.text} />
-          </Pressable>
-          <Text style={[styles.headerTitle, { color: theme.colors.text }]}>Đăng ký trại cứu hộ</Text>
-        </View>
+        <ScrollView
+          style={styles.scroll}
+          contentContainerStyle={styles.scrollContent}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="interactive"
+          showsVerticalScrollIndicator={false}
+        >
+          {/* Header */}
+          <View style={styles.header}>
+            <Pressable
+              style={({ pressed }) => [
+                styles.backBtn,
+                { backgroundColor: theme.colors.card },
+                pressed && { opacity: 0.7 },
+              ]}
+              onPress={() => router.back()}
+            >
+              <Ionicons
+                name="chevron-back"
+                size={20}
+                color={theme.colors.text}
+              />
+            </Pressable>
+            <Text style={[styles.headerTitle, { color: theme.colors.text }]}>
+              Đăng ký trại cứu hộ
+            </Text>
+          </View>
 
-        {/* Status banner */}
-        {shelterStatus !== 'unsubmitted' && (
-          <View style={[styles.statusBanner, { backgroundColor: shelterStatus === 'approved' ? theme.colors.successContainer : shelterStatus === 'rejected' ? theme.colors.errorContainer : theme.colors.warningContainer, borderColor: shelterStatus === 'approved' ? theme.colors.success : shelterStatus === 'rejected' ? theme.colors.error : theme.colors.warning, flexDirection: 'column', alignItems: 'flex-start' }]}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-              <Ionicons name={statusInfo.icon} size={18} color={shelterStatus === 'approved' ? theme.colors.success : shelterStatus === 'rejected' ? theme.colors.error : theme.colors.warning} />
-              <Text style={[styles.statusText, { color: shelterStatus === 'approved' ? theme.colors.success : shelterStatus === 'rejected' ? theme.colors.error : theme.colors.warning }]}>{statusInfo.label}</Text>
+          {/* Status banner */}
+          {shelterStatus !== "unsubmitted" && (
+            <View
+              style={[
+                styles.statusBanner,
+                {
+                  backgroundColor:
+                    shelterStatus === "approved"
+                      ? theme.colors.successContainer
+                      : shelterStatus === "rejected"
+                        ? theme.colors.errorContainer
+                        : theme.colors.warningContainer,
+                  borderColor:
+                    shelterStatus === "approved"
+                      ? theme.colors.success
+                      : shelterStatus === "rejected"
+                        ? theme.colors.error
+                        : theme.colors.warning,
+                  flexDirection: "column",
+                  alignItems: "flex-start",
+                },
+              ]}
+            >
+              <View
+                style={{ flexDirection: "row", alignItems: "center", gap: 10 }}
+              >
+                <Ionicons
+                  name={statusInfo.icon}
+                  size={18}
+                  color={
+                    shelterStatus === "approved"
+                      ? theme.colors.success
+                      : shelterStatus === "rejected"
+                        ? theme.colors.error
+                        : theme.colors.warning
+                  }
+                />
+                <Text
+                  style={[
+                    styles.statusText,
+                    {
+                      color:
+                        shelterStatus === "approved"
+                          ? theme.colors.success
+                          : shelterStatus === "rejected"
+                            ? theme.colors.error
+                            : theme.colors.warning,
+                    },
+                  ]}
+                >
+                  {statusInfo.label}
+                </Text>
+              </View>
+              {adminNotes && (
+                <Text
+                  style={[
+                    styles.adminNotes,
+                    {
+                      color:
+                        shelterStatus === "approved"
+                          ? theme.colors.success
+                          : shelterStatus === "rejected"
+                            ? theme.colors.error
+                            : theme.colors.warning,
+                      marginTop: 6,
+                      fontWeight: "500",
+                    },
+                  ]}
+                >
+                  Phản hồi: {adminNotes}
+                </Text>
+              )}
             </View>
-            {adminNotes && (
-              <Text style={[styles.adminNotes, { color: shelterStatus === 'approved' ? theme.colors.success : shelterStatus === 'rejected' ? theme.colors.error : theme.colors.warning, marginTop: 6, fontWeight: '500' }]}>
-                Phản hồi: {adminNotes}
+          )}
+
+          {!isEditable && (
+            <View style={styles.readonlyNotice}>
+              <Ionicons
+                name="lock-closed-outline"
+                size={14}
+                color={theme.colors.muted}
+              />
+              <Text
+                style={[
+                  styles.readonlyNoticeText,
+                  { color: theme.colors.muted },
+                ]}
+              >
+                Đơn đã được gửi và không thể chỉnh sửa
               </Text>
-            )}
+            </View>
+          )}
+
+          <Text style={[styles.headerDesc, { color: theme.colors.muted }]}>
+            Đăng ký trại cứu hộ để quản lý thú cưng, nhận yêu cầu nhận nuôi và
+            xuất hiện trên bản đồ trại cứu hộ.
+          </Text>
+
+          {/* Form fields */}
+          <View style={styles.fieldWrapper}>
+            <Text style={[styles.fieldLabel, { color: theme.colors.text }]}>
+              Tên trại
+            </Text>
+            <View
+              style={[
+                styles.fieldRow,
+                {
+                  backgroundColor: theme.colors.card,
+                  borderColor: theme.colors.border,
+                },
+              ]}
+            >
+              <Ionicons
+                name="business-outline"
+                size={16}
+                color={theme.colors.muted}
+              />
+              <TextInput
+                style={[styles.fieldInput, { color: theme.colors.text }]}
+                value={name}
+                onChangeText={setName}
+                placeholder="Tên trại cứu hộ..."
+                placeholderTextColor={theme.colors.muted}
+                editable={isEditable}
+              />
+            </View>
           </View>
-        )}
 
-        {!isEditable && (
-          <View style={styles.readonlyNotice}>
-            <Ionicons name="lock-closed-outline" size={14} color={theme.colors.muted} />
-            <Text style={[styles.readonlyNoticeText, { color: theme.colors.muted }]}>Đơn đã được gửi và không thể chỉnh sửa</Text>
+          <View style={styles.fieldWrapper}>
+            <Text style={[styles.fieldLabel, { color: theme.colors.text }]}>
+              Số điện thoại
+            </Text>
+            <View
+              style={[
+                styles.fieldRow,
+                {
+                  backgroundColor: theme.colors.card,
+                  borderColor: theme.colors.border,
+                },
+              ]}
+            >
+              <Ionicons
+                name="call-outline"
+                size={16}
+                color={theme.colors.muted}
+              />
+              <TextInput
+                style={[styles.fieldInput, { color: theme.colors.text }]}
+                value={phone}
+                onChangeText={setPhone}
+                placeholder="+84912345678"
+                placeholderTextColor={theme.colors.muted}
+                keyboardType="phone-pad"
+                editable={isEditable}
+              />
+            </View>
           </View>
-        )}
 
-        <Text style={[styles.headerDesc, { color: theme.colors.muted }]}>
-          Đăng ký trại cứu hộ để quản lý thú cưng, nhận yêu cầu nhận nuôi và xuất hiện trên bản đồ trại cứu hộ.
-        </Text>
-
-        {/* Form fields */}
-        <View style={styles.fieldWrapper}>
-          <Text style={[styles.fieldLabel, { color: theme.colors.text }]}>Tên trại</Text>
-          <View style={[styles.fieldRow, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}>
-            <Ionicons name="business-outline" size={16} color={theme.colors.muted} />
-            <TextInput
-              style={[styles.fieldInput, { color: theme.colors.text }]}
-              value={name}
-              onChangeText={setName}
-              placeholder="Tên trại cứu hộ..."
-              placeholderTextColor={theme.colors.muted}
-              editable={isEditable}
-            />
+          <View style={styles.fieldWrapper}>
+            <Text style={[styles.fieldLabel, { color: theme.colors.text }]}>
+              Địa chỉ
+            </Text>
+            <View
+              style={[
+                styles.fieldRow,
+                {
+                  backgroundColor: theme.colors.card,
+                  borderColor: theme.colors.border,
+                },
+              ]}
+            >
+              <Ionicons
+                name="location-outline"
+                size={16}
+                color={theme.colors.muted}
+              />
+              <TextInput
+                style={[styles.fieldInput, { color: theme.colors.text }]}
+                value={address}
+                onChangeText={setAddress}
+                placeholder="Địa chỉ trại..."
+                placeholderTextColor={theme.colors.muted}
+                editable={isEditable}
+              />
+            </View>
           </View>
-        </View>
 
-        <View style={styles.fieldWrapper}>
-          <Text style={[styles.fieldLabel, { color: theme.colors.text }]}>Số điện thoại</Text>
-          <View style={[styles.fieldRow, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}>
-            <Ionicons name="call-outline" size={16} color={theme.colors.muted} />
-            <TextInput
-              style={[styles.fieldInput, { color: theme.colors.text }]}
-              value={phone}
-              onChangeText={setPhone}
-              placeholder="+84912345678"
-              placeholderTextColor={theme.colors.muted}
-              keyboardType="phone-pad"
-              editable={isEditable}
-            />
+          <View style={[styles.fieldWrapper, { marginBottom: 40 }]}>
+            <Text style={[styles.fieldLabel, { color: theme.colors.text }]}>
+              Mô tả
+            </Text>
+            <View
+              style={[
+                styles.fieldRow,
+                {
+                  backgroundColor: theme.colors.card,
+                  borderColor: theme.colors.border,
+                  minHeight: 80,
+                  alignItems: "flex-start",
+                  paddingVertical: 12,
+                },
+              ]}
+            >
+              <Ionicons
+                name="document-text-outline"
+                size={16}
+                color={theme.colors.muted}
+                style={{ marginTop: 2 }}
+              />
+              <TextInput
+                style={[
+                  styles.fieldInput,
+                  {
+                    color: theme.colors.text,
+                    minHeight: 60,
+                    textAlignVertical: "top",
+                  },
+                ]}
+                value={description}
+                onChangeText={setDescription}
+                placeholder="Mô tả về trại cứu hộ..."
+                placeholderTextColor={theme.colors.muted}
+                multiline
+                numberOfLines={3}
+                editable={isEditable}
+              />
+            </View>
           </View>
-        </View>
 
-        <View style={styles.fieldWrapper}>
-          <Text style={[styles.fieldLabel, { color: theme.colors.text }]}>Địa chỉ</Text>
-          <View style={[styles.fieldRow, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}>
-            <Ionicons name="location-outline" size={16} color={theme.colors.muted} />
-            <TextInput
-              style={[styles.fieldInput, { color: theme.colors.text }]}
-              value={address}
-              onChangeText={setAddress}
-              placeholder="Địa chỉ trại..."
-              placeholderTextColor={theme.colors.muted}
-              editable={isEditable}
-            />
-          </View>
-        </View>
-
-        <View style={[styles.fieldWrapper, { marginBottom: 40 }]}>
-          <Text style={[styles.fieldLabel, { color: theme.colors.text }]}>Mô tả</Text>
-          <View style={[styles.fieldRow, { backgroundColor: theme.colors.card, borderColor: theme.colors.border, minHeight: 80, alignItems: 'flex-start', paddingVertical: 12 }]}>
-            <Ionicons name="document-text-outline" size={16} color={theme.colors.muted} style={{ marginTop: 2 }} />
-            <TextInput
-              style={[styles.fieldInput, { color: theme.colors.text, minHeight: 60, textAlignVertical: 'top' }]}
-              value={description}
-              onChangeText={setDescription}
-              placeholder="Mô tả về trại cứu hộ..."
-              placeholderTextColor={theme.colors.muted}
-              multiline
-              numberOfLines={3}
-              editable={isEditable}
-            />
-          </View>
-        </View>
-
-        <View style={{ height: 100 }} />
-      </ScrollView>
+          <View style={{ height: 100 }} />
+        </ScrollView>
       </KeyboardAvoidingView>
 
       {/* Sticky bottom bar */}
-      <View style={[styles.bottomBar, { backgroundColor: theme.colors.card, borderTopColor: theme.colors.border, paddingBottom: Math.max(20, insets.bottom) }]}>
+      <View
+        style={[
+          styles.bottomBar,
+          {
+            backgroundColor: theme.colors.card,
+            borderTopColor: theme.colors.border,
+            paddingBottom: Math.max(20, insets.bottom),
+          },
+        ]}
+      >
         <Pressable
-          style={({ pressed }) => [styles.cancelBtn, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }, pressed && { opacity: 0.7 }]}
+          style={({ pressed }) => [
+            styles.cancelBtn,
+            {
+              backgroundColor: theme.colors.card,
+              borderColor: theme.colors.border,
+            },
+            pressed && { opacity: 0.7 },
+          ]}
           onPress={() => router.back()}
         >
-          <Text style={[styles.cancelText, { color: theme.colors.text }]}>Huỷ</Text>
+          <Text style={[styles.cancelText, { color: theme.colors.text }]}>
+            Huỷ
+          </Text>
         </Pressable>
         {isEditable && (
           <Pressable
             style={({ pressed }) => [
               styles.saveBtn,
-              { backgroundColor: canSave ? theme.colors.primary : theme.colors.disabled, shadowColor: theme.colors.primary },
+              {
+                backgroundColor: canSave
+                  ? theme.colors.primary
+                  : theme.colors.disabled,
+                shadowColor: theme.colors.primary,
+              },
               pressed && canSave && { opacity: 0.85 },
             ]}
             onPress={handleSave}
             disabled={!canSave || saving}
           >
             {saving ? (
-              <ActivityIndicator size="small" color={canSave ? 'white' : theme.colors.muted} />
+              <ActivityIndicator
+                size="small"
+                color={canSave ? "white" : theme.colors.muted}
+              />
             ) : (
-              <Text style={[styles.saveText, !canSave && { color: theme.colors.muted }]}>
-                {existingId ? 'Cập nhật' : 'Gửi đăng ký'}
+              <Text
+                style={[
+                  styles.saveText,
+                  !canSave && { color: theme.colors.muted },
+                ]}
+              >
+                {existingId ? "Cập nhật" : "Gửi đăng ký"}
               </Text>
             )}
           </Pressable>
@@ -263,50 +505,109 @@ export default function ShelterRegistrationScreen() {
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: '#F5F5F8' },
+  screen: { flex: 1, backgroundColor: "#F5F5F8" },
   scroll: { flex: 1 },
   scrollContent: { paddingHorizontal: 20, paddingTop: 0, paddingBottom: 20 },
-  header: { flexDirection: 'row', alignItems: 'center', gap: 14, marginBottom: 16, paddingTop: 16 },
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 14,
+    marginBottom: 16,
+    paddingTop: 16,
+  },
   backBtn: {
-    width: 40, height: 40, borderRadius: 20,
-    backgroundColor: 'white', alignItems: 'center', justifyContent: 'center',
-    shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08, shadowRadius: 10, elevation: 3,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "white",
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 10,
+    elevation: 3,
   },
-  headerTitle: { fontSize: 26, fontWeight: '800', color: '#1A1A1A' },
+  headerTitle: { fontSize: 26, fontWeight: "800", color: "#1A1A1A" },
   statusBanner: {
-    flexDirection: 'row', alignItems: 'center', gap: 10,
-    borderWidth: 1.5, borderRadius: 14, padding: 14, marginBottom: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    borderWidth: 1.5,
+    borderRadius: 14,
+    padding: 14,
+    marginBottom: 12,
   },
-  statusText: { fontSize: 14, fontWeight: '700', flex: 1 },
-  adminNotes: { fontSize: 12, fontWeight: '500', flex: 1, marginTop: 4 },
-  readonlyNotice: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 },
-  readonlyNoticeText: { fontSize: 12, color: '#9CA3AF', fontWeight: '500' },
-  headerDesc: { fontSize: 14, color: '#6B7280', lineHeight: 22, marginBottom: 24 },
+  statusText: { fontSize: 14, fontWeight: "700", flex: 1 },
+  adminNotes: { fontSize: 12, fontWeight: "500", flex: 1, marginTop: 4 },
+  readonlyNotice: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginBottom: 12,
+  },
+  readonlyNoticeText: { fontSize: 12, color: "#9CA3AF", fontWeight: "500" },
+  headerDesc: {
+    fontSize: 14,
+    color: "#6B7280",
+    lineHeight: 22,
+    marginBottom: 24,
+  },
   fieldWrapper: { marginBottom: 16 },
-  fieldLabel: { fontSize: 13, fontWeight: '600', color: '#555', marginBottom: 8 },
-  fieldRow: {
-    backgroundColor: 'white', borderRadius: 18, borderWidth: 1.5, borderColor: '#EEE',
-    paddingHorizontal: 16, paddingVertical: 14,
-    flexDirection: 'row', alignItems: 'center', gap: 10,
+  fieldLabel: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: "#555",
+    marginBottom: 8,
   },
-  fieldInput: { flex: 1, fontSize: 15, fontWeight: '600', color: '#1A1A1A' },
+  fieldRow: {
+    backgroundColor: "white",
+    borderRadius: 18,
+    borderWidth: 1.5,
+    borderColor: "#EEE",
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  fieldInput: { flex: 1, fontSize: 15, fontWeight: "600", color: "#1A1A1A" },
   bottomBar: {
-    flexDirection: 'row', gap: 12, paddingHorizontal: 16, paddingTop: 14,
-    backgroundColor: 'white', borderTopWidth: 1, borderTopColor: '#F3F4F6',
+    flexDirection: "row",
+    gap: 12,
+    paddingHorizontal: 16,
+    paddingTop: 14,
+    backgroundColor: "white",
+    borderTopWidth: 1,
+    borderTopColor: "#F3F4F6",
   },
   cancelBtn: {
-    flex: 1, backgroundColor: 'white', borderWidth: 1.5, borderColor: '#E5E7EB',
-    borderRadius: 16, paddingVertical: 15, alignItems: 'center',
+    flex: 1,
+    backgroundColor: "white",
+    borderWidth: 1.5,
+    borderColor: "#E5E7EB",
+    borderRadius: 16,
+    paddingVertical: 15,
+    alignItems: "center",
   },
-  cancelText: { fontSize: 15, fontWeight: '700', color: '#6B7280' },
+  cancelText: { fontSize: 15, fontWeight: "700", color: "#6B7280" },
   saveBtn: {
-    flex: 2, backgroundColor: '#FF4FA3', borderRadius: 16,
-    paddingVertical: 15, alignItems: 'center',
-    shadowColor: '#FF4FA3', shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.35, shadowRadius: 20, elevation: 8,
+    flex: 2,
+    backgroundColor: "#FF4FA3",
+    borderRadius: 16,
+    paddingVertical: 15,
+    alignItems: "center",
+    shadowColor: "#FF4FA3",
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.35,
+    shadowRadius: 20,
+    elevation: 8,
   },
-  saveBtnDisabled: { backgroundColor: '#F3F4F6', shadowOpacity: 0, elevation: 0 },
-  saveText: { fontSize: 15, fontWeight: '700', color: 'white' },
-  saveTextDisabled: { color: '#9CA3AF' },
+  saveBtnDisabled: {
+    backgroundColor: "#F3F4F6",
+    shadowOpacity: 0,
+    elevation: 0,
+  },
+  saveText: { fontSize: 15, fontWeight: "700", color: "white" },
+  saveTextDisabled: { color: "#9CA3AF" },
 });

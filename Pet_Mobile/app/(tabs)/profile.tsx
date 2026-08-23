@@ -242,7 +242,7 @@ export default function ProfileScreen() {
 
           {/* Info */}
           <View style={styles.heroInfo}>
-            <Text style={styles.heroName}>{user?.display_name ?? '—'}</Text>
+            <Text style={styles.heroName}>{user?.name || user?.display_name || '—'}</Text>
             <Text style={styles.heroEmail}>{user?.email ?? ''}</Text>
             <View style={styles.heroBadge}>
               <Ionicons name="shield-checkmark" size={11} color="white" />

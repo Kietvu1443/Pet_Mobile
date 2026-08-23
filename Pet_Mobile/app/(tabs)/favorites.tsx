@@ -316,158 +316,77 @@ function FavoriteCard({
             </Text>
           </Pressable>
         ) : (
-          <View style={styles.favActionsContainer}>
-            {/* Row 1: Detail, Note, Collection */}
-            <View style={styles.favActionsRow}>
-              {/* Detail Button */}
-              <Pressable
-                style={({ pressed }) => [
-                  styles.iconActionBtn,
-                  { backgroundColor: theme.colors.surface },
-                  pressed && { opacity: 0.8 },
-                ]}
-                onPress={(e) => {
-                  e.stopPropagation();
-                  onDetail(item.id);
-                }}
-              >
-                <Ionicons
-                  name="eye-outline"
-                  size={16}
-                  color={theme.colors.text}
-                />
-              </Pressable>
+          <View style={styles.favActionsRow}>
+            {/* 1. Reminder Bell */}
+            <Pressable
+              style={({ pressed }) => [
+                styles.iconActionBtn,
+                {
+                  backgroundColor: reminder
+                    ? `${theme.colors.primary}22`
+                    : theme.colors.surface,
+                  borderColor: reminder
+                    ? theme.colors.primary
+                    : "transparent",
+                  borderWidth: reminder ? 1 : 0,
+                },
+                pressed && { opacity: 0.8 },
+              ]}
+              onPress={(e) => {
+                e.stopPropagation();
+                onOpenReminder(item);
+              }}
+            >
+              <Ionicons
+                name={reminder ? "notifications" : "notifications-outline"}
+                size={16}
+                color={reminder ? theme.colors.primary : theme.colors.text}
+              />
+            </Pressable>
 
-              {/* Note Button */}
-              <Pressable
-                style={({ pressed }) => [
-                  styles.iconActionBtn,
-                  {
-                    backgroundColor: noteContent
-                      ? `${theme.colors.primary}22`
+            {/* 2. Superlike Star */}
+            <Pressable
+              style={({ pressed }) => [
+                styles.iconActionBtn,
+                {
+                  backgroundColor:
+                    item.type === "superliked"
+                      ? "#FFF8E1"
                       : theme.colors.surface,
-                    borderColor: noteContent
-                      ? theme.colors.primary
-                      : "transparent",
-                    borderWidth: noteContent ? 1 : 0,
-                  },
-                  pressed && { opacity: 0.8 },
-                ]}
-                onPress={(e) => {
-                  e.stopPropagation();
-                  onOpenNote(item);
-                }}
-              >
-                <Ionicons
-                  name={noteContent ? "create" : "create-outline"}
-                  size={15}
-                  color={noteContent ? theme.colors.primary : theme.colors.text}
-                />
-              </Pressable>
+                  borderColor:
+                    item.type === "superliked" ? "#FFB800" : "transparent",
+                  borderWidth: item.type === "superliked" ? 1 : 0,
+                },
+                pressed && { opacity: 0.8 },
+              ]}
+              onPress={(e) => {
+                e.stopPropagation();
+                onSuperlike(item);
+              }}
+            >
+              <Ionicons
+                name={item.type === "superliked" ? "star" : "star-outline"}
+                size={16}
+                color={
+                  item.type === "superliked" ? "#FFB800" : theme.colors.text
+                }
+              />
+            </Pressable>
 
-              {/* Collection Folder Button */}
-              <Pressable
-                style={({ pressed }) => [
-                  styles.iconActionBtn,
-                  {
-                    backgroundColor: hasCollections
-                      ? `${theme.colors.primary}22`
-                      : theme.colors.surface,
-                    borderColor: hasCollections
-                      ? theme.colors.primary
-                      : "transparent",
-                    borderWidth: hasCollections ? 1 : 0,
-                  },
-                  pressed && { opacity: 0.8 },
-                ]}
-                onPress={(e) => {
-                  e.stopPropagation();
-                  onAddToCollection(item);
-                }}
-              >
-                <Ionicons
-                  name={hasCollections ? "folder" : "folder-open-outline"}
-                  size={15}
-                  color={
-                    hasCollections ? theme.colors.primary : theme.colors.text
-                  }
-                />
-              </Pressable>
-            </View>
-
-            {/* Row 2: Reminder Bell, Superlike Star, Heart Dislike */}
-            <View style={styles.favActionsRow}>
-              {/* Reminder Bell Button */}
-              <Pressable
-                style={({ pressed }) => [
-                  styles.iconActionBtn,
-                  {
-                    backgroundColor: reminder
-                      ? `${theme.colors.primary}22`
-                      : theme.colors.surface,
-                    borderColor: reminder
-                      ? theme.colors.primary
-                      : "transparent",
-                    borderWidth: reminder ? 1 : 0,
-                  },
-                  pressed && { opacity: 0.8 },
-                ]}
-                onPress={(e) => {
-                  e.stopPropagation();
-                  onOpenReminder(item);
-                }}
-              >
-                <Ionicons
-                  name={reminder ? "notifications" : "notifications-outline"}
-                  size={15}
-                  color={reminder ? theme.colors.primary : theme.colors.text}
-                />
-              </Pressable>
-
-              {/* Superlike Star Button */}
-              <Pressable
-                style={({ pressed }) => [
-                  styles.iconActionBtn,
-                  {
-                    backgroundColor:
-                      item.type === "superliked"
-                        ? "#FFF8E1"
-                        : theme.colors.surface,
-                    borderColor:
-                      item.type === "superliked" ? "#FFB800" : "transparent",
-                    borderWidth: item.type === "superliked" ? 1 : 0,
-                  },
-                  pressed && { opacity: 0.8 },
-                ]}
-                onPress={(e) => {
-                  e.stopPropagation();
-                  onSuperlike(item);
-                }}
-              >
-                <Ionicons
-                  name={item.type === "superliked" ? "star" : "star-outline"}
-                  size={15}
-                  color={
-                    item.type === "superliked" ? "#FFB800" : theme.colors.text
-                  }
-                />
-              </Pressable>
-
-              {/* Like / Dislike Heart Button */}
-              <Pressable
-                style={({ pressed }) => [
-                  styles.iconActionBtn,
-                  { backgroundColor: theme.colors.primaryContainer },
-                  pressed && { opacity: 0.8 },
-                ]}
-                onPress={(e) => {
-                  e.stopPropagation();
-                  onRemove(item.id);
-                }}
-              >
-                <Ionicons name="heart" size={15} color={theme.colors.primary} />
-              </Pressable>
-            </View>
+            {/* 3. Like/Dislike Heart */}
+            <Pressable
+              style={({ pressed }) => [
+                styles.iconActionBtn,
+                { backgroundColor: theme.colors.primaryContainer },
+                pressed && { opacity: 0.8 },
+              ]}
+              onPress={(e) => {
+                e.stopPropagation();
+                onRemove(item.id);
+              }}
+            >
+              <Ionicons name="heart" size={16} color={theme.colors.primary} />
+            </Pressable>
           </View>
         )}
       </View>
@@ -907,48 +826,34 @@ export default function FavoritesScreen() {
 
   const statCards = [
     {
+      id: "liked" as FilterType,
       Icon: "heart" as const,
       color: theme.colors.primary,
-      bg: theme.colors.primaryContainer,
+      iconBg: theme.colors.primaryContainer,
+      activeBg: theme.colors.primary,
+      activeColor: "white",
       count: likedItems.length,
       label: t("favorites:likedCount"),
     },
     {
+      id: "superliked" as FilterType,
       Icon: "star" as const,
       color: "#FFB800",
-      bg: "#FFF8E1",
+      iconBg: "#FFF8E1",
+      activeBg: "#FFB800",
+      activeColor: "white",
       count: superlikedItems.length,
       label: "Siêu thích ⭐",
-    },
-    {
-      Icon: "close" as const,
-      color: theme.colors.muted,
-      bg: theme.colors.surface,
-      count: passedItems.length,
-      label: t("favorites:passedCount"),
-    },
-  ];
-
-  const filterOptions = [
-    {
-      id: "all" as FilterType,
-      label: t("favorites:filterAll"),
-      count: allSaved.length,
-    },
-    {
-      id: "liked" as FilterType,
-      label: t("favorites:filterLiked"),
-      count: likedItems.length,
-    },
-    {
-      id: "superliked" as FilterType,
-      label: "Siêu thích ⭐",
-      count: superlikedItems.length,
     },
     {
       id: "passed" as FilterType,
-      label: t("favorites:passedCount"),
+      Icon: "close" as const,
+      color: theme.colors.muted,
+      iconBg: theme.colors.surface,
+      activeBg: theme.colors.text,
+      activeColor: "white",
       count: passedItems.length,
+      label: t("favorites:passedCount"),
     },
   ];
 
@@ -959,13 +864,14 @@ export default function FavoritesScreen() {
   };
 
   return (
-    <ScrollView
-      style={[styles.screen, { backgroundColor: theme.colors.background }]}
-      contentContainerStyle={[
-        styles.content,
-        { paddingTop: Math.max(insets.top, 38) + 12, paddingBottom: 120 },
-      ]}
-      showsVerticalScrollIndicator={false}
+    <View style={[styles.screen, { backgroundColor: theme.colors.background }]}>
+      <ScrollView
+        style={styles.screen}
+        contentContainerStyle={[
+          styles.content,
+          { paddingTop: Math.max(insets.top, 38) + 12, paddingBottom: 140 },
+        ]}
+        showsVerticalScrollIndicator={false}
       refreshControl={
         <RefreshControl
           refreshing={refreshing}
@@ -1102,9 +1008,27 @@ export default function FavoritesScreen() {
           <Text
             style={[styles.compareHintText, { color: theme.colors.primary }]}
           >
-            Chế độ so sánh: Chọn tối đa 3 thú cưng ({selectedForCompare.length}
-            /3)
+            Đang chọn so sánh ({selectedForCompare.length}/3)
           </Text>
+
+          {selectedForCompare.length >= 2 && (
+            <Pressable
+              style={({ pressed }) => [
+                styles.bannerActionBtn,
+                { backgroundColor: theme.colors.primary },
+                pressed && { opacity: 0.85 },
+              ]}
+              onPress={() => {
+                router.push({
+                  pathname: "/compare-pets",
+                  params: { petIds: selectedForCompare.join(",") },
+                });
+              }}
+            >
+              <Ionicons name="checkmark-circle" size={14} color="white" />
+              <Text style={styles.bannerActionBtnText}>So sánh</Text>
+            </Pressable>
+          )}
         </View>
       )}
 
@@ -1210,85 +1134,83 @@ export default function FavoritesScreen() {
         </View>
       )}
 
-      {/* Stat Cards */}
+      {/* Stat Cards (Clickable Solid-Fill Filter Cards) */}
       <View style={styles.statsRow}>
-        {statCards.map(({ Icon, color, bg, count, label }) => (
-          <View
-            key={label}
-            style={[
-              styles.statCard,
-              {
-                backgroundColor: theme.colors.card,
-                borderColor: theme.colors.border,
-              },
-            ]}
-          >
-            <View style={[styles.statIconWrap, { backgroundColor: bg }]}>
-              <Ionicons name={Icon} size={18} color={color} />
-            </View>
-            <Text style={[styles.statCount, { color }]}>{count}</Text>
-            <Text style={[styles.statLabel, { color: theme.colors.muted }]}>
-              {label}
-            </Text>
-          </View>
-        ))}
-      </View>
-
-      {/* Row 1: Interaction Filter Chips */}
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={{ gap: 8, paddingBottom: 2, marginBottom: 12 }}
-      >
-        {filterOptions.map((f) => {
-          const isActive = filter === f.id;
-          return (
-            <Pressable
-              key={f.id}
-              style={[
-                styles.filterChip,
-                {
-                  backgroundColor: isActive
-                    ? theme.colors.primary
-                    : theme.colors.card,
-                  borderColor: theme.colors.border,
-                },
-              ]}
-              onPress={() => setFilter(f.id)}
-            >
-              <Text
-                style={[
-                  styles.filterChipText,
-                  { color: isActive ? "white" : theme.colors.text },
+        {statCards.map(
+          ({
+            id,
+            Icon,
+            color,
+            iconBg,
+            activeBg,
+            activeColor,
+            count,
+            label,
+          }) => {
+            const isActive = filter === id;
+            const isFiltering = filter !== "all";
+            return (
+              <Pressable
+                key={id}
+                style={({ pressed }) => [
+                  styles.statCard,
+                  {
+                    backgroundColor: isActive
+                      ? activeBg
+                      : theme.colors.card,
+                    borderColor: isActive ? activeBg : theme.colors.border,
+                    borderWidth: 1,
+                    shadowColor: isActive ? activeBg : "#000",
+                    shadowOpacity: isActive ? 0.28 : 0.07,
+                    shadowRadius: isActive ? 10 : 6,
+                    elevation: isActive ? 6 : 3,
+                    opacity: isFiltering && !isActive ? 0.45 : pressed ? 0.8 : 1,
+                  },
                 ]}
+                onPress={() => setFilter(filter === id ? "all" : id)}
               >
-                {f.label}
-              </Text>
-              {f.count > 0 && (
                 <View
                   style={[
-                    styles.filterCount,
+                    styles.statIconWrap,
                     {
                       backgroundColor: isActive
-                        ? "rgba(255,255,255,0.25)"
-                        : theme.colors.surface,
+                        ? "rgba(255, 255, 255, 0.25)"
+                        : iconBg,
                     },
                   ]}
                 >
-                  <Text
-                    style={[
-                      styles.filterCountText,
-                      { color: isActive ? "white" : theme.colors.muted },
-                    ]}
-                  >
-                    {f.count}
-                  </Text>
+                  <Ionicons
+                    name={Icon}
+                    size={18}
+                    color={isActive ? activeColor : color}
+                  />
                 </View>
-              )}
-            </Pressable>
-          );
-        })}
-      </ScrollView>
+                <Text
+                  style={[
+                    styles.statCount,
+                    { color: isActive ? activeColor : color },
+                  ]}
+                >
+                  {count}
+                </Text>
+                <Text
+                  style={[
+                    styles.statLabel,
+                    {
+                      color: isActive
+                        ? activeColor
+                        : theme.colors.muted,
+                      fontWeight: isActive ? "800" : "500",
+                    },
+                  ]}
+                >
+                  {label}
+                </Text>
+              </Pressable>
+            );
+          },
+        )}
+      </View>
 
       {/* Row 2: Collection Filter Chips */}
       {collections.length > 0 && (
@@ -1532,14 +1454,22 @@ export default function FavoritesScreen() {
         onClose={() => setReminderModalPet(null)}
       />
 
-      {/* Floating Action Button for Compare */}
+      </ScrollView>
+
+      {/* Fixed Floating Action Button for Compare (Always visible on screen when 2+ selected) */}
       {selectedForCompare.length >= 2 && (
-        <View style={styles.fabContainer}>
+        <View
+          pointerEvents="box-none"
+          style={[
+            styles.fabContainer,
+            { bottom: Math.max(insets.bottom, 16) + 70 },
+          ]}
+        >
           <Pressable
             style={({ pressed }) => [
               styles.compareFab,
               { backgroundColor: theme.colors.primary },
-              pressed && { opacity: 0.9 },
+              pressed && { opacity: 0.9, transform: [{ scale: 0.97 }] },
             ]}
             onPress={() => {
               router.push({
@@ -1549,18 +1479,18 @@ export default function FavoritesScreen() {
             }}
           >
             <Ionicons
-              name="swap-horizontal"
-              size={18}
+              name="checkmark-circle"
+              size={20}
               color="white"
               style={{ marginRight: 6 }}
             />
             <Text style={styles.compareFabText}>
-              So sánh ({selectedForCompare.length}/3)
+              ✓ Tiến hành so sánh ({selectedForCompare.length}/3)
             </Text>
           </Pressable>
         </View>
       )}
-    </ScrollView>
+    </View>
   );
 }
 
@@ -1608,29 +1538,6 @@ const styles = StyleSheet.create({
   },
   statCount: { fontSize: 22, fontWeight: "800", marginBottom: 3 },
   statLabel: { fontSize: 11, fontWeight: "500" },
-  // Filter chips
-  filterChip: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    flexShrink: 0,
-    borderRadius: 20,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 6,
-    elevation: 2,
-    borderWidth: 1,
-  },
-  filterChipText: { fontSize: 13, fontWeight: "700" },
-  filterCount: {
-    borderRadius: 10,
-    paddingHorizontal: 7,
-    paddingVertical: 1,
-  },
-  filterCountText: { fontSize: 12, fontWeight: "700" },
   // Grid
   grid: {
     flexDirection: "row",
@@ -1763,9 +1670,7 @@ const styles = StyleSheet.create({
     paddingVertical: 9,
     width: "100%",
   },
-  favActionsContainer: { flexDirection: "column", gap: 6, width: "100%" },
   favActionsRow: { flexDirection: "row", gap: 6, width: "100%" },
-  favActions: { flexDirection: "row", gap: 5, alignItems: "center" },
   iconActionBtn: {
     flex: 1,
     height: 34,
@@ -1811,6 +1716,19 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     flex: 1,
     lineHeight: 18,
+  },
+  bannerActionBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+  },
+  bannerActionBtnText: {
+    color: "white",
+    fontSize: 12,
+    fontWeight: "800",
   },
   searchBarWrap: {
     flexDirection: "row",

@@ -53,7 +53,8 @@ export function login(displayName: string, password: string): Promise<LoginRespo
 export type RegisterData = {
   display_name: string;
   name: string;
-  phone: string;
+  phone?: string;
+  email?: string;
   password: string;
   confirmPassword: string;
 };

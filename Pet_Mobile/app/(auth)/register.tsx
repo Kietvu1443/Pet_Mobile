@@ -9,6 +9,7 @@ import {
   ActivityIndicator,
   Animated,
   Easing,
+  Keyboard,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -131,7 +132,10 @@ function InputPill({
     <View
       style={[
         styles.inputPill,
-        { backgroundColor: theme.colors.card, borderColor: theme.colors.border },
+        {
+          backgroundColor: theme.colors.card,
+          borderColor: theme.colors.border,
+        },
         focused && { borderColor: theme.colors.primary, borderWidth: 2 },
         !editable && { opacity: 0.6 },
       ]}
@@ -178,6 +182,22 @@ export default function RegisterScreen() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
+  const [isKeyboardVisible, setKeyboardVisible] = useState(false);
+
+  useEffect(() => {
+    const showSub = Keyboard.addListener(
+      Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow",
+      () => setKeyboardVisible(true),
+    );
+    const hideSub = Keyboard.addListener(
+      Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide",
+      () => setKeyboardVisible(false),
+    );
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, []);
 
   const PHONE_REGEX = /^0[35789][0-9]{8}$/;
 
@@ -195,7 +215,7 @@ export default function RegisterScreen() {
     password.length === 0 ||
     confirmPassword.length === 0;
 
-  const canSubmit = isValidPhone && !submitting && !isFormEmpty;
+  const canSubmit = !submitting && !isFormEmpty;
 
   async function handleSubmit() {
     if (!canSubmit) return;
@@ -246,22 +266,31 @@ export default function RegisterScreen() {
       behavior={Platform.OS === "ios" ? "padding" : undefined}
     >
       <ScrollView
-        contentContainerStyle={styles.scroll}
+        contentContainerStyle={[
+          styles.scroll,
+          isKeyboardVisible && { paddingTop: 16, paddingBottom: 160 },
+        ]}
         keyboardShouldPersistTaps="handled"
-        keyboardDismissMode="interactive"
+        keyboardDismissMode="on-drag"
         showsVerticalScrollIndicator={false}
       >
-        {/* ── Khu vực minh họa ── */}
-        <View style={styles.illustrationWrapper}>
-          <SpeechBubble />
-          <View style={[styles.dogCircle, { borderColor: theme.colors.border }]}>
-            <DogCharacter />
+        {/* ── Khu vực minh họa (Tự ẩn khi bật bàn phím để tiết kiệm diện tích) ── */}
+        {!isKeyboardVisible && (
+          <View style={styles.illustrationWrapper}>
+            <SpeechBubble />
+            <View
+              style={[styles.dogCircle, { borderColor: theme.colors.border }]}
+            >
+              <DogCharacter />
+            </View>
           </View>
-        </View>
+        )}
 
         {/* ── Tiêu đề ── */}
         <View style={styles.headerText}>
-          <Text style={[styles.title, { color: theme.colors.text }]}>Tạo tài khoản</Text>
+          <Text style={[styles.title, { color: theme.colors.text }]}>
+            Tạo tài khoản
+          </Text>
           <Text style={[styles.subtitle, { color: theme.colors.muted }]}>
             Đăng ký để đồng hành cùng các bé thú cưng!
           </Text>
@@ -346,9 +375,23 @@ export default function RegisterScreen() {
 
           {/* Thông báo lỗi */}
           {error.length > 0 && (
-            <View style={[styles.errorBox, { backgroundColor: theme.colors.errorContainer, borderColor: theme.colors.error }]}>
-              <Ionicons name="alert-circle-outline" size={18} color={theme.colors.error} />
-              <Text style={[styles.errorText, { color: theme.colors.error }]}>{error}</Text>
+            <View
+              style={[
+                styles.errorBox,
+                {
+                  backgroundColor: theme.colors.errorContainer,
+                  borderColor: theme.colors.error,
+                },
+              ]}
+            >
+              <Ionicons
+                name="alert-circle-outline"
+                size={18}
+                color={theme.colors.error}
+              />
+              <Text style={[styles.errorText, { color: theme.colors.error }]}>
+                {error}
+              </Text>
             </View>
           )}
 
@@ -363,8 +406,14 @@ export default function RegisterScreen() {
               style={[
                 styles.registerBtn,
                 canSubmit
-                  ? { backgroundColor: theme.colors.primary, shadowColor: theme.colors.primary }
-                  : { backgroundColor: theme.colors.disabled, shadowOpacity: 0 },
+                  ? {
+                      backgroundColor: theme.colors.primary,
+                      shadowColor: theme.colors.primary,
+                    }
+                  : {
+                      backgroundColor: theme.colors.disabled,
+                      shadowOpacity: 0,
+                    },
               ]}
             >
               {submitting ? (
@@ -378,9 +427,13 @@ export default function RegisterScreen() {
 
         {/* ── Footer ── */}
         <View style={styles.footer}>
-          <Text style={[styles.footerText, { color: theme.colors.muted }]}>Đã có tài khoản? </Text>
+          <Text style={[styles.footerText, { color: theme.colors.muted }]}>
+            Đã có tài khoản?{" "}
+          </Text>
           <TouchableOpacity onPress={() => router.push("/(auth)/login")}>
-            <Text style={[styles.footerLink, { color: theme.colors.primary }]}>Đăng nhập</Text>
+            <Text style={[styles.footerLink, { color: theme.colors.primary }]}>
+              Đăng nhập
+            </Text>
           </TouchableOpacity>
         </View>
       </ScrollView>
@@ -405,7 +458,7 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     paddingHorizontal: 24,
     paddingTop: 56,
-    paddingBottom: 40,
+    paddingBottom: 80,
     alignItems: "center",
   },
   // Illustration
@@ -531,9 +584,9 @@ const styles = StyleSheet.create({
   },
   // Error
   errorBox: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
     gap: 8,
     borderWidth: 1.5,
     borderRadius: 16,
@@ -549,7 +602,7 @@ const styles = StyleSheet.create({
   },
   // Register button
   btnWrapper: {
-    width: '100%',
+    width: "100%",
     marginTop: 4,
   },
   registerBtn: {

@@ -3,13 +3,14 @@
 // Giữ nguyên toàn bộ logic nghiệp vụ (AuthContext, ApiError).
 // Nâng cấp giao diện: cún SVG hoạt họa, bong bóng thoại nảy nhẹ,
 // inputs hình viên thuốc có icon, nền pastel ấm áp.
-import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
-import { useEffect, useRef, useState } from 'react';
+import { Ionicons } from "@expo/vector-icons";
+import { useRouter } from "expo-router";
+import { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Animated,
   Easing,
+  Keyboard,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -19,12 +20,12 @@ import {
   TextInput,
   TouchableOpacity,
   View,
-} from 'react-native';
-import { Circle, Ellipse, Path, Svg } from 'react-native-svg';
+} from "react-native";
+import { Circle, Ellipse, Path, Svg } from "react-native-svg";
 
-import { ApiError } from '@/lib/api/client';
-import { useAuth } from '@/lib/auth/AuthContext';
-import { useTheme } from '@/lib/theme/ThemeContext';
+import { ApiError } from "@/lib/api/client";
+import { useAuth } from "@/lib/auth/AuthContext";
+import { useTheme } from "@/lib/theme/ThemeContext";
 
 // ─── Nhân vật cún hoạt họa SVG ───────────────────────────────────────────────
 function DogCharacter() {
@@ -96,7 +97,7 @@ function SpeechBubble() {
           easing: Easing.inOut(Easing.ease),
           useNativeDriver: true,
         }),
-      ])
+      ]),
     ).start();
   }, [floatAnim]);
 
@@ -147,7 +148,7 @@ function FloatingIcon({
           easing: Easing.inOut(Easing.ease),
           useNativeDriver: true,
         }),
-      ])
+      ]),
     ).start();
   }, [floatAnim, delay]);
 
@@ -156,7 +157,12 @@ function FloatingIcon({
       pointerEvents="none"
       style={[
         styles.floatingIcon,
-        { top: top as number, left: left as number, right: right as number, bottom: bottom as number },
+        {
+          top: top as number,
+          left: left as number,
+          right: right as number,
+          bottom: bottom as number,
+        },
         { transform: [{ translateY: floatAnim }] },
       ]}
     >
@@ -173,7 +179,7 @@ function InputPill({
   onChangeText,
   secureTextEntry,
   editable = true,
-  autoCapitalize = 'none',
+  autoCapitalize = "none",
   returnKeyType,
   onSubmitEditing,
   rightElement,
@@ -184,8 +190,8 @@ function InputPill({
   onChangeText: (t: string) => void;
   secureTextEntry?: boolean;
   editable?: boolean;
-  autoCapitalize?: 'none' | 'sentences' | 'words' | 'characters';
-  returnKeyType?: 'go' | 'done' | 'next';
+  autoCapitalize?: "none" | "sentences" | "words" | "characters";
+  returnKeyType?: "go" | "done" | "next";
   onSubmitEditing?: () => void;
   rightElement?: React.ReactNode;
 }) {
@@ -196,7 +202,10 @@ function InputPill({
     <View
       style={[
         styles.inputPill,
-        { backgroundColor: theme.colors.card, borderColor: theme.colors.border },
+        {
+          backgroundColor: theme.colors.card,
+          borderColor: theme.colors.border,
+        },
         focused && { borderColor: theme.colors.primary, borderWidth: 2 },
         !editable && { opacity: 0.6 },
       ]}
@@ -232,11 +241,27 @@ export default function LoginScreen() {
   const { theme } = useTheme();
   const { login } = useAuth();
   const router = useRouter();
-  const [displayName, setDisplayName] = useState('');
-  const [password, setPassword] = useState('');
+  const [displayName, setDisplayName] = useState("");
+  const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState('');
+  const [error, setError] = useState("");
+  const [isKeyboardVisible, setKeyboardVisible] = useState(false);
+
+  useEffect(() => {
+    const showSub = Keyboard.addListener(
+      Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow",
+      () => setKeyboardVisible(true),
+    );
+    const hideSub = Keyboard.addListener(
+      Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide",
+      () => setKeyboardVisible(false),
+    );
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, []);
 
   const canSubmit =
     displayName.trim().length > 0 && password.length > 0 && !submitting;
@@ -244,14 +269,14 @@ export default function LoginScreen() {
   async function handleSubmit() {
     if (!canSubmit) return;
     setSubmitting(true);
-    setError('');
+    setError("");
     try {
       await login(displayName.trim(), password);
     } catch (e) {
       const message =
         e instanceof ApiError
           ? e.message
-          : 'Không thể đăng nhập, vui lòng thử lại';
+          : "Không thể đăng nhập, vui lòng thử lại";
       setError(message);
     } finally {
       setSubmitting(false);
@@ -261,33 +286,56 @@ export default function LoginScreen() {
   return (
     <KeyboardAvoidingView
       style={[styles.flex, { backgroundColor: theme.colors.background }]}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      behavior={Platform.OS === "ios" ? "padding" : undefined}
     >
       {/* Biểu tượng trang trí nền */}
       <FloatingIcon name="paw" size={36} top={70} left={20} delay={0} />
       <FloatingIcon name="star" size={24} top={160} right={18} delay={600} />
       <FloatingIcon name="paw" size={28} bottom={220} left={12} delay={1200} />
-      <FloatingIcon name="flower-outline" size={32} bottom={100} right={20} delay={400} />
-      <FloatingIcon name="heart-outline" size={22} top={380} right={10} delay={900} />
+      <FloatingIcon
+        name="flower-outline"
+        size={32}
+        bottom={100}
+        right={20}
+        delay={400}
+      />
+      <FloatingIcon
+        name="heart-outline"
+        size={22}
+        top={380}
+        right={10}
+        delay={900}
+      />
 
       <ScrollView
-        contentContainerStyle={styles.scroll}
+        contentContainerStyle={[
+          styles.scroll,
+          isKeyboardVisible && { paddingTop: 16, paddingBottom: 140 },
+        ]}
         keyboardShouldPersistTaps="handled"
-        keyboardDismissMode="interactive"
+        keyboardDismissMode="on-drag"
         showsVerticalScrollIndicator={false}
       >
-        {/* ── Khu vực minh họa ── */}
-        <View style={styles.illustrationWrapper}>
-          <SpeechBubble />
-          <View style={[styles.dogCircle, { borderColor: theme.colors.border }]}>
-            <DogCharacter />
+        {/* ── Khu vực minh họa (Tự ẩn khi mở bàn phím) ── */}
+        {!isKeyboardVisible && (
+          <View style={styles.illustrationWrapper}>
+            <SpeechBubble />
+            <View
+              style={[styles.dogCircle, { borderColor: theme.colors.border }]}
+            >
+              <DogCharacter />
+            </View>
           </View>
-        </View>
+        )}
 
         {/* ── Tiêu đề ── */}
         <View style={styles.headerText}>
-          <Text style={[styles.title, { color: theme.colors.text }]}>Đăng nhập</Text>
-          <Text style={[styles.subtitle, { color: theme.colors.muted }]}>Vui lòng đăng nhập để tiếp tục!</Text>
+          <Text style={[styles.title, { color: theme.colors.text }]}>
+            Đăng nhập
+          </Text>
+          <Text style={[styles.subtitle, { color: theme.colors.muted }]}>
+            Vui lòng đăng nhập để tiếp tục!
+          </Text>
         </View>
 
         {/* ── Form ── */}
@@ -317,7 +365,7 @@ export default function LoginScreen() {
                 hitSlop={8}
               >
                 <Ionicons
-                  name={showPassword ? 'eye-off-outline' : 'eye-outline'}
+                  name={showPassword ? "eye-off-outline" : "eye-outline"}
                   size={18}
                   color={theme.colors.muted}
                 />
@@ -330,7 +378,14 @@ export default function LoginScreen() {
 
           {/* Nút Đăng nhập */}
           <TouchableOpacity
-            style={[styles.loginBtn, { backgroundColor: theme.colors.primary, shadowColor: theme.colors.primary }, !canSubmit && styles.loginBtnDisabled]}
+            style={[
+              styles.loginBtn,
+              {
+                backgroundColor: theme.colors.primary,
+                shadowColor: theme.colors.primary,
+              },
+              !canSubmit && styles.loginBtnDisabled,
+            ]}
             onPress={handleSubmit}
             disabled={!canSubmit}
             activeOpacity={0.85}
@@ -369,7 +424,7 @@ export default function LoginScreen() {
         {/* ── Footer ── */}
         <View style={styles.footer}>
           <Text style={styles.footerText}>Chưa có tài khoản? </Text>
-          <TouchableOpacity onPress={() => router.push('/(auth)/register')}>
+          <TouchableOpacity onPress={() => router.push("/(auth)/register")}>
             <Text style={styles.footerLink}>Đăng ký</Text>
           </TouchableOpacity>
         </View>
@@ -379,13 +434,13 @@ export default function LoginScreen() {
 }
 
 // ─── Styles ──────────────────────────────────────────────────────────────────
-const PRIMARY = '#83541D';
-const ACCENT = '#E5A96A';
-const BG = '#EDF7FF';
-const SURFACE = '#fff8f5';
-const ON_SURFACE = '#241912';
-const ON_SURFACE_VARIANT = '#514539';
-const OUTLINE_VARIANT = '#D5C3B5';
+const PRIMARY = "#83541D";
+const ACCENT = "#E5A96A";
+const BG = "#EDF7FF";
+const SURFACE = "#fff8f5";
+const ON_SURFACE = "#241912";
+const ON_SURFACE_VARIANT = "#514539";
+const OUTLINE_VARIANT = "#D5C3B5";
 
 const styles = StyleSheet.create({
   flex: {
@@ -397,32 +452,32 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     paddingTop: 64,
     paddingBottom: 40,
-    alignItems: 'center',
+    alignItems: "center",
   },
   // Floating decorations
   floatingIcon: {
-    position: 'absolute',
+    position: "absolute",
     zIndex: 0,
   },
   // Illustration
   illustrationWrapper: {
-    alignItems: 'center',
+    alignItems: "center",
     marginBottom: 32,
-    position: 'relative',
+    position: "relative",
     width: 180,
     height: 160,
-    justifyContent: 'flex-end',
+    justifyContent: "flex-end",
   },
   dogCircle: {
     width: 150,
     height: 150,
     borderRadius: 75,
-    backgroundColor: '#ffeade',
-    overflow: 'hidden',
+    backgroundColor: "#ffeade",
+    overflow: "hidden",
     borderWidth: 4,
-    borderColor: '#fff',
-    alignItems: 'center',
-    justifyContent: 'center',
+    borderColor: "#fff",
+    alignItems: "center",
+    justifyContent: "center",
     shadowColor: PRIMARY,
     shadowOffset: { width: 0, height: 10 },
     shadowOpacity: 0.15,
@@ -431,10 +486,10 @@ const styles = StyleSheet.create({
   },
   // Speech bubble
   speechBubble: {
-    position: 'absolute',
+    position: "absolute",
     top: 0,
     right: 0,
-    backgroundColor: '#fff',
+    backgroundColor: "#fff",
     borderRadius: 20,
     paddingHorizontal: 14,
     paddingVertical: 8,
@@ -448,52 +503,52 @@ const styles = StyleSheet.create({
     zIndex: 10,
   },
   speechText: {
-    fontFamily: 'Fredoka_700Bold',
+    fontFamily: "Fredoka_700Bold",
     fontSize: 18,
     color: PRIMARY,
     lineHeight: 22,
   },
   speechTail: {
-    position: 'absolute',
+    position: "absolute",
     bottom: -8,
     left: 14,
     width: 14,
     height: 14,
-    backgroundColor: '#fff',
+    backgroundColor: "#fff",
     borderBottomWidth: 2,
     borderRightWidth: 2,
     borderColor: ACCENT,
-    transform: [{ rotate: '45deg' }],
+    transform: [{ rotate: "45deg" }],
   },
   // Header text
   headerText: {
-    alignItems: 'center',
+    alignItems: "center",
     marginBottom: 28,
   },
   title: {
-    fontFamily: 'Fredoka_700Bold',
+    fontFamily: "Fredoka_700Bold",
     fontSize: 36,
     color: PRIMARY,
     marginBottom: 4,
   },
   subtitle: {
-    fontFamily: 'Fredoka_400Regular',
+    fontFamily: "Fredoka_400Regular",
     fontSize: 16,
     color: ON_SURFACE_VARIANT,
   },
   // Form
   form: {
-    width: '100%',
+    width: "100%",
     gap: 14,
     marginBottom: 4,
   },
   inputPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#fff',
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#fff",
     borderRadius: 50,
     paddingHorizontal: 20,
-    paddingVertical: Platform.OS === 'ios' ? 16 : 12,
+    paddingVertical: Platform.OS === "ios" ? 16 : 12,
     borderWidth: 2,
     borderColor: OUTLINE_VARIANT,
     shadowColor: PRIMARY,
@@ -516,7 +571,7 @@ const styles = StyleSheet.create({
   },
   inputText: {
     flex: 1,
-    fontFamily: 'Fredoka_400Regular',
+    fontFamily: "Fredoka_400Regular",
     fontSize: 16,
     color: ON_SURFACE,
   },
@@ -526,9 +581,9 @@ const styles = StyleSheet.create({
   },
   // Error
   errorBox: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
     gap: 8,
     borderWidth: 1.5,
     borderRadius: 16,
@@ -536,20 +591,20 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   errorText: {
-    fontFamily: 'Fredoka_400Regular',
+    fontFamily: "Fredoka_400Regular",
     fontSize: 14,
-    color: '#ba1a1a',
-    textAlign: 'center',
+    color: "#ba1a1a",
+    textAlign: "center",
   },
   // Login button
   btnWrapper: {
-    width: '100%',
+    width: "100%",
     marginTop: 4,
   },
   loginBtn: {
     borderRadius: 50,
     paddingVertical: 16,
-    alignItems: 'center',
+    alignItems: "center",
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.2,
     shadowRadius: 10,
@@ -559,16 +614,16 @@ const styles = StyleSheet.create({
     opacity: 0.5,
   },
   loginBtnText: {
-    fontFamily: 'Fredoka_600SemiBold',
+    fontFamily: "Fredoka_600SemiBold",
     fontSize: 18,
     color: ON_SURFACE,
     letterSpacing: 0.3,
   },
   // Divider
   divider: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    width: '100%',
+    flexDirection: "row",
+    alignItems: "center",
+    width: "100%",
     marginVertical: 24,
     gap: 10,
   },
@@ -578,62 +633,62 @@ const styles = StyleSheet.create({
     backgroundColor: OUTLINE_VARIANT,
   },
   dividerText: {
-    fontFamily: 'Fredoka_400Regular',
+    fontFamily: "Fredoka_400Regular",
     fontSize: 11,
     color: ON_SURFACE_VARIANT,
     letterSpacing: 1.2,
   },
   // Social buttons
   socialRow: {
-    flexDirection: 'row',
+    flexDirection: "row",
     gap: 12,
-    width: '100%',
+    width: "100%",
   },
   socialBtn: {
     flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
     gap: 8,
     paddingVertical: 14,
     backgroundColor: SURFACE,
     borderRadius: 16,
     borderWidth: 1.5,
     borderColor: OUTLINE_VARIANT,
-    shadowColor: '#000',
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
     shadowRadius: 4,
     elevation: 2,
   },
   socialBtnFb: {
-    backgroundColor: '#1877F2',
-    borderColor: '#1877F2',
+    backgroundColor: "#1877F2",
+    borderColor: "#1877F2",
   },
   socialBtnText: {
-    fontFamily: 'Fredoka_600SemiBold',
+    fontFamily: "Fredoka_600SemiBold",
     fontSize: 15,
     color: ON_SURFACE,
   },
   socialBtnTextFb: {
-    color: '#fff',
+    color: "#fff",
   },
   // Footer
   footer: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     marginTop: 28,
   },
   footerText: {
-    fontFamily: 'Fredoka_400Regular',
+    fontFamily: "Fredoka_400Regular",
     fontSize: 15,
     color: ON_SURFACE_VARIANT,
   },
   footerLink: {
-    fontFamily: 'Fredoka_700Bold',
+    fontFamily: "Fredoka_700Bold",
     fontSize: 15,
     color: PRIMARY,
-    textDecorationLine: 'underline',
-    textDecorationStyle: 'solid',
+    textDecorationLine: "underline",
+    textDecorationStyle: "solid",
   },
 });

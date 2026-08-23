@@ -16,6 +16,8 @@ export type PetReminder = {
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
     shouldShowAlert: true,
+    shouldShowBanner: true,
+    shouldShowList: true,
     shouldPlaySound: true,
     shouldSetBadge: true,
   }),
@@ -120,17 +122,25 @@ export async function schedulePetReminder(
     ? `⭐ Đừng bỏ lỡ bé ${petName} mà bạn đặc biệt quan tâm nhé! Đã đến giờ quay lại rồi nè 🐾`
     : `Đã đến giờ quay lại xem thông tin hoặc liên hệ nhận nuôi bé ${petName} rồi nè! 🐾`;
 
+  const secondsFromNow = Math.max(1, Math.floor((targetDate.getTime() - Date.now()) / 1000));
+
   const notificationId = await Notifications.scheduleNotificationAsync({
     content: {
       title,
       body,
       data: { petId },
       sound: 'default',
+      ...(Platform.OS === 'android' ? { channelId: 'default' } : {}),
     },
-    trigger: {
-      type: Notifications.SchedulableTriggerInputTypes.DATE,
-      date: targetDate,
-    },
+    trigger: secondsFromNow <= 300
+      ? {
+          type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
+          seconds: secondsFromNow,
+        }
+      : {
+          type: Notifications.SchedulableTriggerInputTypes.DATE,
+          date: targetDate,
+        },
   });
 
   // 4. Save to AsyncStorage

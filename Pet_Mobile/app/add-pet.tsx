@@ -1,17 +1,19 @@
-// AddPetScreen — Màn hình đăng ký thú cưng mới (3 bước).
+// AddPetScreen — Màn hình đăng ký thú cưng cá nhân mới (3 bước).
 //
-// Nguồn dữ liệu:
+// Nguồn dữ liệu & submit:
 //   - Form fields: component state
-//   - Submit: POST /api/v1/pets (TODO: kiểm tra endpoint này có tồn tại không)
-//             Hiện tại submission là visual-only (TODO comment bên dưới).
+//   - Submit: POST /api/v1/user-pets (Lưu vào bảng user_pets cá nhân)
 //
 // 3 bước:
-//   Bước 1 — Thông tin cơ bản: loài, giống, tên, giới tính, ảnh
-//   Bước 2 — Chi tiết: tuổi, màu lông, khu vực, tính cách
+//   Bước 1 — Thông tin cơ bản: loài, giống, tên, giới tính, chọn tối đa 5 ảnh
+//   Bước 2 — Chi tiết: ngày sinh/tuổi, cân nặng, tiêm phòng, màu lông, tính cách
 //   Bước 3 — Hoàn tất: xem lại & đăng
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import {
+  ActivityIndicator,
+  Alert,
+  Image,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -23,8 +25,11 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import * as ImagePicker from 'expo-image-picker';
 
 import { useTheme } from '@/lib/theme/ThemeContext';
+import { createUserPet, formatAgeFromBirthDate } from '@/lib/api/userPets';
+import { AddPetSuccessModal } from '@/components/AddPetSuccessModal';
 
 const TRAITS_SUGGESTIONS = [
   'Hiền lành', 'Năng động', 'Yêu trẻ con', 'Trầm tính',
@@ -33,12 +38,18 @@ const TRAITS_SUGGESTIONS = [
 
 const STEPS = [
   { step: 1, title: 'Thông tin cơ bản', subtitle: 'Loài, giống & ảnh đại diện' },
-  { step: 2, title: 'Chi tiết', subtitle: 'Tính cách & mô tả' },
-  { step: 3, title: 'Hoàn tất', subtitle: 'Xem lại & đăng' },
+  { step: 2, title: 'Chi tiết', subtitle: 'Tuổi, cân nặng & tính cách' },
+  { step: 3, title: 'Hoàn tất', subtitle: 'Xem lại & lưu bé' },
 ];
 
 type Species = 'cat' | 'dog' | 'other';
 type Gender = 'male' | 'female';
+
+export type SelectedImage = {
+  uri: string;
+  name: string;
+  type: string;
+};
 
 function FormLabel({ children, inline }: { children: string; inline?: boolean }) {
   const { theme } = useTheme();
@@ -56,7 +67,7 @@ function FormInput({
   value: string;
   onChangeText: (v: string) => void;
   placeholder: string;
-  keyboardType?: 'default' | 'numeric';
+  keyboardType?: 'default' | 'numeric' | 'decimal-pad';
 }) {
   const { theme } = useTheme();
   return (
@@ -76,11 +87,15 @@ function Step1({
   gender, setGender,
   name, setName,
   breed, setBreed,
+  images, pickImages, removeImage,
 }: {
   species: Species; setSpecies: (s: Species) => void;
   gender: Gender; setGender: (g: Gender) => void;
   name: string; setName: (v: string) => void;
   breed: string; setBreed: (v: string) => void;
+  images: SelectedImage[];
+  pickImages: () => void;
+  removeImage: (index: number) => void;
 }) {
   const speciesOptions: { id: Species; emoji: string; label: string }[] = [
     { id: 'cat', emoji: '🐱', label: 'Mèo' },
@@ -92,14 +107,43 @@ function Step1({
     <View>
       {/* Photo upload */}
       <View style={{ marginBottom: 28 }}>
-        <FormLabel>Ảnh đại diện *</FormLabel>
-        <Pressable style={styles.photoUpload}>
-          <View style={styles.cameraIcon}>
-            <Ionicons name="camera" size={26} color="#FF4FA3" />
-          </View>
-          <Text style={styles.photoUploadTitle}>Thêm ảnh</Text>
-          <Text style={styles.photoUploadSub}>Tối đa 5 ảnh · JPG, PNG</Text>
-        </Pressable>
+        <FormLabel>Hình ảnh bé (Tối đa 5 ảnh)</FormLabel>
+        
+        {images.length > 0 && (
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 12 }}>
+            <View style={{ flexDirection: 'row', gap: 10, paddingVertical: 4 }}>
+              {images.map((img, idx) => (
+                <View key={idx} style={styles.imageThumbnailWrap}>
+                  <Image source={{ uri: img.uri }} style={styles.imageThumbnail} />
+                  {idx === 0 && (
+                    <View style={styles.avatarBadge}>
+                      <Text style={styles.avatarBadgeText}>Ảnh chính</Text>
+                    </View>
+                  )}
+                  <Pressable style={styles.removeImageBtn} onPress={() => removeImage(idx)}>
+                    <Ionicons name="close" size={14} color="white" />
+                  </Pressable>
+                </View>
+              ))}
+              {images.length < 5 && (
+                <Pressable style={styles.addMoreImageBtn} onPress={pickImages}>
+                  <Ionicons name="add" size={24} color="#FF4FA3" />
+                  <Text style={styles.addMoreImageText}>Thêm</Text>
+                </Pressable>
+              )}
+            </View>
+          </ScrollView>
+        )}
+
+        {images.length === 0 && (
+          <Pressable style={styles.photoUpload} onPress={pickImages}>
+            <View style={styles.cameraIcon}>
+              <Ionicons name="camera" size={26} color="#FF4FA3" />
+            </View>
+            <Text style={styles.photoUploadTitle}>Thêm ảnh</Text>
+            <Text style={styles.photoUploadSub}>Tối đa 5 ảnh · JPG, PNG</Text>
+          </Pressable>
+        )}
       </View>
 
       {/* Species */}
@@ -124,12 +168,12 @@ function Step1({
       {/* Name */}
       <View style={{ marginBottom: 20 }}>
         <FormLabel>Tên bé *</FormLabel>
-        <FormInput value={name} onChangeText={setName} placeholder="Tên thú cưng..." />
+        <FormInput value={name} onChangeText={setName} placeholder="Tên thú cưng của bạn..." />
       </View>
 
       {/* Breed */}
       <View style={{ marginBottom: 20 }}>
-        <FormLabel>Giống *</FormLabel>
+        <FormLabel>Giống</FormLabel>
         <FormInput value={breed} onChangeText={setBreed} placeholder="VD: Mèo ta, Corgi, Poodle..." />
       </View>
 
@@ -156,34 +200,56 @@ function Step1({
 
 function Step2({
   ageYear, setAgeYear, ageMonth, setAgeMonth,
+  weight, setWeight,
   color, setColor,
+  vaccinated, setVaccinated,
   traits, traitInput, setTraitInput,
   addCustomTrait, toggleTrait,
 }: {
   ageYear: string; setAgeYear: (v: string) => void;
   ageMonth: string; setAgeMonth: (v: string) => void;
+  weight: string; setWeight: (v: string) => void;
   color: string; setColor: (v: string) => void;
+  vaccinated: boolean; setVaccinated: (v: boolean) => void;
   traits: string[]; traitInput: string; setTraitInput: (v: string) => void;
   addCustomTrait: () => void; toggleTrait: (t: string) => void;
 }) {
+  const { theme } = useTheme();
+
   return (
     <View>
       {/* Age */}
       <View style={{ marginBottom: 24 }}>
-        <FormLabel>Tuổi *</FormLabel>
+        <FormLabel>Tuổi ước tính</FormLabel>
         <View style={{ flexDirection: 'row', gap: 12 }}>
           {[{ val: ageYear, set: setAgeYear, unit: 'năm' }, { val: ageMonth, set: setAgeMonth, unit: 'tháng' }].map(({ val, set, unit }) => (
             <View key={unit} style={{ flex: 1, position: 'relative' }}>
               <TextInput
-                style={[styles.formInput, { paddingRight: 56 }]}
+                style={[styles.formInput, { backgroundColor: theme.colors.card, borderColor: theme.colors.border, color: theme.colors.text, paddingRight: 56 }]}
                 value={val}
                 onChangeText={set}
                 keyboardType="numeric"
-                placeholderTextColor="#CCCCCC"
+                placeholderTextColor={theme.colors.muted}
               />
               <Text style={styles.ageUnit}>{unit}</Text>
             </View>
           ))}
+        </View>
+      </View>
+
+      {/* Weight */}
+      <View style={{ marginBottom: 24 }}>
+        <FormLabel>Cân nặng (kg)</FormLabel>
+        <View style={{ position: 'relative' }}>
+          <TextInput
+            style={[styles.formInput, { backgroundColor: theme.colors.card, borderColor: theme.colors.border, color: theme.colors.text, paddingRight: 56 }]}
+            value={weight}
+            onChangeText={setWeight}
+            placeholder="VD: 4.5"
+            keyboardType="decimal-pad"
+            placeholderTextColor={theme.colors.muted}
+          />
+          <Text style={styles.ageUnit}>kg</Text>
         </View>
       </View>
 
@@ -193,23 +259,33 @@ function Step2({
         <FormInput value={color} onChangeText={setColor} placeholder="VD: Vàng, Đen trắng, Tam thể..." />
       </View>
 
-      {/* Location selects - static UI */}
+      {/* Vaccinated toggle */}
       <View style={{ marginBottom: 24 }}>
-        <FormLabel>Khu vực *</FormLabel>
-        <View style={{ flexDirection: 'row', gap: 12 }}>
-          <View style={[styles.formInput, { flex: 1, justifyContent: 'center' }]}>
-            <Text style={{ color: '#CCCCCC', fontSize: 14 }}>Thành phố...</Text>
-          </View>
-          <View style={[styles.formInput, { flex: 1, justifyContent: 'center' }]}>
-            <Text style={{ color: '#CCCCCC', fontSize: 14 }}>Chọn phường...</Text>
-          </View>
+        <FormLabel>Tình trạng tiêm phòng</FormLabel>
+        <View style={styles.genderRow}>
+          <Pressable
+            style={[styles.genderBtn, vaccinated && styles.genderBtnActive]}
+            onPress={() => setVaccinated(true)}
+          >
+            <Text style={[styles.genderBtnText, vaccinated && styles.genderBtnTextActive]}>
+              ✓ Đã tiêm phòng
+            </Text>
+          </Pressable>
+          <Pressable
+            style={[styles.genderBtn, !vaccinated && styles.genderBtnActive]}
+            onPress={() => setVaccinated(false)}
+          >
+            <Text style={[styles.genderBtnText, !vaccinated && styles.genderBtnTextActive]}>
+              Chưa tiêm phòng
+            </Text>
+          </Pressable>
         </View>
       </View>
 
       {/* Traits */}
       <View style={{ marginBottom: 24 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-          <FormLabel inline>Tính cách *</FormLabel>
+          <FormLabel inline>Tính cách</FormLabel>
           <Text style={{ fontSize: 13, color: '#AAAAAA' }}>· tối đa 5</Text>
         </View>
 
@@ -225,11 +301,11 @@ function Step2({
 
         <View style={{ flexDirection: 'row', gap: 10 }}>
           <TextInput
-            style={[styles.formInput, { flex: 1 }]}
+            style={[styles.formInput, { flex: 1, backgroundColor: theme.colors.card, borderColor: theme.colors.border, color: theme.colors.text }]}
             value={traitInput}
             onChangeText={setTraitInput}
             placeholder="Nhập tính cách..."
-            placeholderTextColor="#CCCCCC"
+            placeholderTextColor={theme.colors.muted}
             onSubmitEditing={addCustomTrait}
             returnKeyType="done"
           />
@@ -252,19 +328,44 @@ function Step2({
   );
 }
 
-function Step3({ name, breed, species, gender, traits }: {
-  name: string; breed: string; species: Species; gender: Gender; traits: string[];
+function Step3({
+  name, breed, species, gender, traits, weight, vaccinated, birthDateStr, images,
+}: {
+  name: string;
+  breed: string;
+  species: Species;
+  gender: Gender;
+  traits: string[];
+  weight: string;
+  vaccinated: boolean;
+  birthDateStr: string | null;
+  images: SelectedImage[];
 }) {
   const speciesEmoji = species === 'cat' ? '🐱' : species === 'dog' ? '🐶' : '🐰';
+  const ageDisplay = formatAgeFromBirthDate(birthDateStr);
+
   return (
     <View>
       <View style={styles.previewCard}>
         <View style={styles.previewImageArea}>
-          <Text style={{ fontSize: 80 }}>{speciesEmoji}</Text>
+          {images.length > 0 ? (
+            <Image source={{ uri: images[0].uri }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
+          ) : (
+            <Text style={{ fontSize: 80 }}>{speciesEmoji}</Text>
+          )}
         </View>
         <View style={{ padding: 20 }}>
           <Text style={styles.previewName}>{name || 'Tên bé'}</Text>
-          <Text style={styles.previewBreed}>{breed || 'Giống'} · {gender === 'male' ? 'Đực' : 'Cái'}</Text>
+          <Text style={styles.previewBreed}>
+            {breed || (species === 'cat' ? 'Mèo' : species === 'dog' ? 'Chó' : 'Thú cưng')} · {gender === 'male' ? 'Đực' : 'Cái'} · {ageDisplay}
+          </Text>
+
+          {weight ? (
+            <Text style={{ fontSize: 13, color: '#666', marginBottom: 10 }}>
+              ⚖️ Cân nặng: {weight} kg {vaccinated ? '· ✓ Đã tiêm phòng' : ''}
+            </Text>
+          ) : null}
+
           {traits.length > 0 && (
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
               {traits.map((t) => (
@@ -278,11 +379,11 @@ function Step3({ name, breed, species, gender, traits }: {
       </View>
 
       <View style={styles.previewNote}>
-        <Text style={{ fontSize: 22, flexShrink: 0 }}>🎉</Text>
-        <View>
+        <Text style={{ fontSize: 22, flexShrink: 0 }}>🏠</Text>
+        <View style={{ flex: 1 }}>
           <Text style={styles.previewNoteTitle}>Sắp hoàn tất!</Text>
           <Text style={styles.previewNoteDesc}>
-            Sau khi đăng, hồ sơ của bé sẽ được hiển thị để người dùng khác có thể nhận nuôi.
+            Bé sẽ được thêm vào danh sách "Thú cưng của tôi" để bạn dễ dàng quản lý và chăm sóc.
           </Text>
         </View>
       </View>
@@ -302,9 +403,68 @@ export default function AddPetScreen() {
   const [breed, setBreed] = useState('');
   const [ageYear, setAgeYear] = useState('0');
   const [ageMonth, setAgeMonth] = useState('0');
+  const [weight, setWeight] = useState('');
   const [color, setColor] = useState('');
+  const [vaccinated, setVaccinated] = useState(false);
   const [traits, setTraits] = useState<string[]>([]);
   const [traitInput, setTraitInput] = useState('');
+  const [images, setImages] = useState<SelectedImage[]>([]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [createdPetName, setCreatedPetName] = useState('');
+
+  // Tính birth_date ISO string (YYYY-MM-DD) từ số năm/tháng
+  const calculateBirthDate = (): string | null => {
+    const y = parseInt(ageYear, 10) || 0;
+    const m = parseInt(ageMonth, 10) || 0;
+    if (y === 0 && m === 0) return null;
+
+    const d = new Date();
+    d.setFullYear(d.getFullYear() - y);
+    d.setMonth(d.getMonth() - m);
+    return d.toISOString().split('T')[0];
+  };
+
+  const pickImages = async () => {
+    if (images.length >= 5) {
+      Alert.alert('Giới hạn', 'Bạn chỉ có thể chọn tối đa 5 ảnh.');
+      return;
+    }
+
+    try {
+      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!permission.granted) {
+        Alert.alert('Quyền truy cập', 'Vui lòng cấp quyền truy cập thư viện ảnh để thêm ảnh bé.');
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsMultipleSelection: true,
+        selectionLimit: 5 - images.length,
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets) {
+        const newImages: SelectedImage[] = result.assets.map((asset, index) => {
+          const uri = asset.uri;
+          const ext = uri.split('.').pop() || 'jpg';
+          const fileName = asset.fileName || `pet_${Date.now()}_${index}.${ext}`;
+          const type = asset.mimeType || (ext === 'png' ? 'image/png' : 'image/jpeg');
+          return { uri, name: fileName, type };
+        });
+
+        setImages((prev) => [...prev, ...newImages].slice(0, 5));
+      }
+    } catch (error) {
+      console.error('Error picking image:', error);
+      Alert.alert('Lỗi', 'Không thể mở thư viện ảnh.');
+    }
+  };
+
+  const removeImage = (index: number) => {
+    setImages((prev) => prev.filter((_, i) => i !== index));
+  };
 
   const toggleTrait = (t: string) => {
     setTraits((prev) =>
@@ -319,161 +479,254 @@ export default function AddPetScreen() {
     }
   };
 
-  const handleNext = () => {
-    if (step < 3) {
-      setStep((s) => s + 1);
-    } else {
-      // TODO: Replace with POST /api/v1/pets when backend endpoint confirmed
-      router.back();
+  const handleSubmit = async () => {
+    if (!name.trim()) {
+      Alert.alert('Thông báo', 'Vui lòng nhập tên cho bé thú cưng.');
+      setStep(1);
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const formData = new FormData();
+      formData.append('name', name.trim());
+      formData.append('species', species);
+      if (breed.trim()) formData.append('breed', breed.trim());
+      formData.append('gender', gender);
+
+      const birthDate = calculateBirthDate();
+      if (birthDate) formData.append('birth_date', birthDate);
+      if (color.trim()) formData.append('color', color.trim());
+      if (weight.trim()) formData.append('weight', weight.trim());
+      formData.append('vaccinated', vaccinated ? '1' : '0');
+      if (traits.length > 0) formData.append('traits', JSON.stringify(traits));
+
+      // Append ảnh
+      images.forEach((img) => {
+        formData.append('images', {
+          uri: Platform.OS === 'ios' ? img.uri.replace('file://', '') : img.uri,
+          name: img.name,
+          type: img.type,
+        } as any);
+      });
+
+      await createUserPet(formData);
+
+      // Mở modal thành công theo design system
+      setCreatedPetName(name.trim());
+      setShowSuccessModal(true);
+    } catch (error: any) {
+      console.error('Create user pet error:', error);
+      Alert.alert('Lỗi', error.message || 'Không thể tạo thú cưng. Vui lòng thử lại.');
+    } finally {
+      setIsSubmitting(false);
     }
   };
+
+  const handleNext = () => {
+    if (step === 1) {
+      if (!name.trim()) {
+        Alert.alert('Thông báo', 'Vui lòng nhập tên cho bé trước khi tiếp tục.');
+        return;
+      }
+      setStep(2);
+    } else if (step === 2) {
+      setStep(3);
+    } else {
+      handleSubmit();
+    }
+  };
+
+  const birthDateStr = calculateBirthDate();
 
   return (
     <KeyboardAvoidingView
       style={{ flex: 1 }}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
-    <View style={[styles.screen, { backgroundColor: theme.colors.background, paddingTop: insets.top }]}>
-      {/* Header */}
-      <View style={styles.header}>
-        <Pressable style={({ pressed }) => [styles.backBtn, { backgroundColor: theme.colors.card }, pressed && { opacity: 0.7 }]} onPress={() => router.back()}>
-          <Ionicons name="chevron-back" size={22} color={theme.colors.text} />
-        </Pressable>
-        <Text style={[styles.headerTitle, { color: theme.colors.text }]}>Thêm thú cưng</Text>
-        <Pressable>
-          <Text style={[styles.draftBtn, { color: theme.colors.primary }]}>Lưu bản nháp</Text>
-        </Pressable>
-      </View>
-
-      {/* Step indicator */}
-      <View style={styles.stepIndicator}>
-        <View>
-          <Text style={[styles.stepTag, { color: theme.colors.primary }]}>Bước {step} / {STEPS.length}</Text>
-          <Text style={[styles.stepTitle, { color: theme.colors.text }]}>{STEPS[step - 1].title}</Text>
-          <Text style={[styles.stepSub, { color: theme.colors.muted }]}>{STEPS[step - 1].subtitle}</Text>
-        </View>
-        <View style={styles.stepDots}>
-          {STEPS.map((s) => (
-            <View
-              key={s.step}
-              style={[
-                styles.stepDot,
-                { backgroundColor: theme.colors.border },
-                { width: s.step === step ? 32 : 7 },
-                s.step <= step && { backgroundColor: theme.colors.primary },
-              ]}
-            />
-          ))}
-        </View>
-      </View>
-
-      {/* Form Content */}
-      <ScrollView
-        style={{ flex: 1 }}
-        contentContainerStyle={{ padding: 24 }}
-        showsVerticalScrollIndicator={false}
-        keyboardShouldPersistTaps="handled"
-      >
-        {step === 1 && (
-          <Step1
-            species={species} setSpecies={setSpecies}
-            gender={gender} setGender={setGender}
-            name={name} setName={setName}
-            breed={breed} setBreed={setBreed}
-          />
-        )}
-        {step === 2 && (
-          <Step2
-            ageYear={ageYear} setAgeYear={setAgeYear}
-            ageMonth={ageMonth} setAgeMonth={setAgeMonth}
-            color={color} setColor={setColor}
-            traits={traits} traitInput={traitInput}
-            setTraitInput={setTraitInput}
-            addCustomTrait={addCustomTrait}
-            toggleTrait={toggleTrait}
-          />
-        )}
-        {step === 3 && (
-          <Step3 name={name} breed={breed} species={species} gender={gender} traits={traits} />
-        )}
-      </ScrollView>
-
-      {/* Bottom Buttons */}
-      <View style={[styles.bottomBar, { paddingBottom: Math.max(16, insets.bottom) }]}>
-        {step > 1 && (
-          <Pressable
-            style={({ pressed }) => [styles.prevBtn, pressed && { opacity: 0.7 }]}
-            onPress={() => setStep((s) => s - 1)}
-          >
-            <Text style={styles.prevBtnText}>Quay lại</Text>
+      <View style={[styles.screen, { backgroundColor: theme.colors.background, paddingTop: insets.top }]}>
+        {/* Header */}
+        <View style={styles.header}>
+          <Pressable style={({ pressed }) => [styles.backBtn, { backgroundColor: theme.colors.card }, pressed && { opacity: 0.7 }]} onPress={() => router.back()}>
+            <Ionicons name="chevron-back" size={22} color={theme.colors.text} />
           </Pressable>
-        )}
-        <Pressable
-          style={({ pressed }) => [styles.nextBtn, { backgroundColor: theme.colors.primary, shadowColor: theme.colors.primary }, pressed && { opacity: 0.85 }]}
-          onPress={handleNext}
+          <Text style={[styles.headerTitle, { color: theme.colors.text }]}>Thêm thú cưng</Text>
+          <View style={{ width: 44 }} />
+        </View>
+
+        {/* Step indicator */}
+        <View style={styles.stepIndicator}>
+          <View>
+            <Text style={[styles.stepTag, { color: theme.colors.primary }]}>Bước {step} / {STEPS.length}</Text>
+            <Text style={[styles.stepTitle, { color: theme.colors.text }]}>{STEPS[step - 1].title}</Text>
+            <Text style={[styles.stepSub, { color: theme.colors.muted }]}>{STEPS[step - 1].subtitle}</Text>
+          </View>
+          <View style={styles.stepDots}>
+            {STEPS.map((s) => (
+              <View
+                key={s.step}
+                style={[
+                  styles.stepDot,
+                  { backgroundColor: theme.colors.border },
+                  { width: s.step === step ? 32 : 7 },
+                  s.step <= step && { backgroundColor: theme.colors.primary },
+                ]}
+              />
+            ))}
+          </View>
+        </View>
+
+        {/* Form Content */}
+        <ScrollView
+          style={{ flex: 1 }}
+          contentContainerStyle={{ padding: 24 }}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
         >
-          <Text style={styles.nextBtnText}>
-            {step < 3 ? 'Tiếp tục' : 'Đăng ngay 🐾'}
-          </Text>
-        </Pressable>
+          {step === 1 && (
+            <Step1
+              species={species} setSpecies={setSpecies}
+              gender={gender} setGender={setGender}
+              name={name} setName={setName}
+              breed={breed} setBreed={setBreed}
+              images={images} pickImages={pickImages} removeImage={removeImage}
+            />
+          )}
+          {step === 2 && (
+            <Step2
+              ageYear={ageYear} setAgeYear={setAgeYear}
+              ageMonth={ageMonth} setAgeMonth={setAgeMonth}
+              weight={weight} setWeight={setWeight}
+              color={color} setColor={setColor}
+              vaccinated={vaccinated} setVaccinated={setVaccinated}
+              traits={traits} traitInput={traitInput}
+              setTraitInput={setTraitInput}
+              addCustomTrait={addCustomTrait}
+              toggleTrait={toggleTrait}
+            />
+          )}
+          {step === 3 && (
+            <Step3
+              name={name} breed={breed} species={species} gender={gender}
+              traits={traits} weight={weight} vaccinated={vaccinated}
+              birthDateStr={birthDateStr} images={images}
+            />
+          )}
+        </ScrollView>
+
+        {/* Bottom Buttons */}
+        <View style={[styles.bottomBar, { backgroundColor: theme.colors.card, paddingBottom: Math.max(16, insets.bottom) }]}>
+          {step > 1 && (
+            <Pressable
+              disabled={isSubmitting}
+              style={({ pressed }) => [styles.prevBtn, { borderColor: theme.colors.border }, pressed && { opacity: 0.7 }]}
+              onPress={() => setStep((s) => s - 1)}
+            >
+              <Text style={[styles.prevBtnText, { color: theme.colors.text }]}>Quay lại</Text>
+            </Pressable>
+          )}
+          <Pressable
+            disabled={isSubmitting}
+            style={({ pressed }) => [
+              styles.nextBtn,
+              { backgroundColor: theme.colors.primary, shadowColor: theme.colors.primary },
+              pressed && { opacity: 0.85 },
+              isSubmitting && { opacity: 0.7 },
+            ]}
+            onPress={handleNext}
+          >
+            {isSubmitting ? (
+              <ActivityIndicator color="white" />
+            ) : (
+              <Text style={styles.nextBtnText}>
+                {step < 3 ? 'Tiếp tục' : 'Lưu bé ngay 🐾'}
+              </Text>
+            )}
+          </Pressable>
+        </View>
+
+        {/* Modal Thành công */}
+        <AddPetSuccessModal
+          visible={showSuccessModal}
+          petName={createdPetName}
+          onConfirm={() => {
+            setShowSuccessModal(false);
+            router.replace('/(tabs)/pets' as Parameters<typeof router.replace>[0]);
+          }}
+        />
       </View>
-    </View>
     </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: '#FFF9FC' },
+  screen: { flex: 1 },
   header: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     paddingHorizontal: 24, paddingBottom: 20, paddingTop: 16,
   },
   backBtn: {
-    width: 44, height: 44, borderRadius: 14, backgroundColor: 'white',
+    width: 44, height: 44, borderRadius: 14,
     alignItems: 'center', justifyContent: 'center',
     shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.08, shadowRadius: 6, elevation: 3,
   },
-  headerTitle: { fontSize: 20, fontWeight: '800', color: '#1A1A1A' },
-  draftBtn: { fontSize: 14, fontWeight: '600', color: '#FF4FA3' },
+  headerTitle: { fontSize: 20, fontWeight: '800' },
   // Step indicator
   stepIndicator: {
     flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between',
     paddingHorizontal: 24, marginBottom: 8,
   },
   stepTag: {
-    color: '#FF4FA3', fontSize: 11, fontWeight: '800',
+    fontSize: 11, fontWeight: '800',
     letterSpacing: 1.5, textTransform: 'uppercase', marginBottom: 3,
   },
-  stepTitle: { fontSize: 20, fontWeight: '800', color: '#1A1A1A', marginBottom: 2 },
-  stepSub: { fontSize: 13, color: '#888' },
+  stepTitle: { fontSize: 20, fontWeight: '800', marginBottom: 2 },
+  stepSub: { fontSize: 13 },
   stepDots: { flexDirection: 'row', gap: 6, marginTop: 6 },
   stepDot: {
-    height: 7, borderRadius: 4, backgroundColor: '#EEE',
+    height: 7, borderRadius: 4,
   },
-  stepDotActive: { backgroundColor: '#FF4FA3' },
   // Form fields
   formLabel: {
-    fontSize: 11, fontWeight: '800', color: '#888',
+    fontSize: 11, fontWeight: '800',
     letterSpacing: 1.2, textTransform: 'uppercase', marginBottom: 8,
   },
   formInput: {
-    backgroundColor: 'white', borderWidth: 1.5, borderColor: '#EEE',
+    borderWidth: 1.5,
     borderRadius: 18, paddingHorizontal: 16, paddingVertical: 15,
-    fontSize: 15, color: '#1A1A1A',
+    fontSize: 15,
   },
   // Photo upload
   photoUpload: {
-    height: 180, backgroundColor: 'white', borderRadius: 22,
+    height: 160, backgroundColor: 'rgba(255, 79, 163, 0.04)', borderRadius: 22,
     borderWidth: 2, borderColor: '#FFBBD8', borderStyle: 'dashed',
     alignItems: 'center', justifyContent: 'center', gap: 10,
   },
   cameraIcon: {
-    width: 56, height: 56, borderRadius: 28,
+    width: 52, height: 52, borderRadius: 26,
     backgroundColor: '#FFF0F7', alignItems: 'center', justifyContent: 'center',
   },
   photoUploadTitle: { fontSize: 15, fontWeight: '600', color: '#FF4FA3' },
   photoUploadSub: { fontSize: 12, color: '#BBB' },
+  imageThumbnailWrap: {
+    width: 90, height: 90, borderRadius: 16, overflow: 'hidden', position: 'relative',
+  },
+  imageThumbnail: { width: '100%', height: '100%' },
+  avatarBadge: {
+    position: 'absolute', bottom: 4, left: 4, backgroundColor: 'rgba(0,0,0,0.65)',
+    paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6,
+  },
+  avatarBadgeText: { color: 'white', fontSize: 9, fontWeight: '700' },
+  removeImageBtn: {
+    position: 'absolute', top: 4, right: 4, width: 22, height: 22, borderRadius: 11,
+    backgroundColor: 'rgba(0,0,0,0.6)', alignItems: 'center', justifyContent: 'center',
+  },
+  addMoreImageBtn: {
+    width: 90, height: 90, borderRadius: 16, borderWidth: 1.5, borderColor: '#FF4FA3',
+    borderStyle: 'dashed', backgroundColor: '#FFF0F7', alignItems: 'center', justifyContent: 'center', gap: 2,
+  },
+  addMoreImageText: { fontSize: 12, fontWeight: '700', color: '#FF4FA3' },
   // Species
   speciesRow: { flexDirection: 'row', gap: 12 },
   speciesBtn: {
@@ -487,9 +740,8 @@ const styles = StyleSheet.create({
   speciesLabelActive: { color: '#FF4FA3' },
   // Gender
   genderRow: {
-    flexDirection: 'row', backgroundColor: 'white',
-    borderRadius: 18, borderWidth: 1.5, borderColor: '#EEE',
-    padding: 4, gap: 4,
+    flexDirection: 'row', backgroundColor: '#F4F4F6',
+    borderRadius: 18, padding: 4, gap: 4,
   },
   genderBtn: {
     flex: 1, borderRadius: 14, paddingVertical: 12,
@@ -500,7 +752,7 @@ const styles = StyleSheet.create({
     shadowColor: '#FF4FA3', shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.30, shadowRadius: 8, elevation: 4,
   },
-  genderBtnText: { fontSize: 15, fontWeight: '700', color: '#888' },
+  genderBtnText: { fontSize: 14, fontWeight: '700', color: '#888' },
   genderBtnTextActive: { color: 'white' },
   // Age unit
   ageUnit: {
@@ -531,11 +783,11 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.10, shadowRadius: 20, elevation: 8, marginBottom: 24,
   },
   previewImageArea: {
-    height: 200, backgroundColor: '#FFF0F7',
+    height: 220, backgroundColor: '#FFF0F7',
     alignItems: 'center', justifyContent: 'center',
   },
   previewName: { fontSize: 24, fontWeight: '800', color: '#1A1A1A', marginBottom: 6 },
-  previewBreed: { fontSize: 15, color: '#777', marginBottom: 16 },
+  previewBreed: { fontSize: 15, color: '#777', marginBottom: 12 },
   previewTrait: {
     backgroundColor: '#FFF0F7', borderRadius: 20, paddingHorizontal: 14, paddingVertical: 5,
   },
@@ -550,19 +802,18 @@ const styles = StyleSheet.create({
   // Bottom bar
   bottomBar: {
     flexDirection: 'row', gap: 12, paddingHorizontal: 24, paddingTop: 16,
-    backgroundColor: 'white',
     shadowColor: '#000', shadowOffset: { width: 0, height: -4 },
     shadowOpacity: 0.06, shadowRadius: 12, elevation: 8,
   },
   prevBtn: {
-    flex: 1, backgroundColor: 'white', borderWidth: 2, borderColor: '#EEE',
+    flex: 1, borderWidth: 2,
     borderRadius: 18, paddingVertical: 16, alignItems: 'center',
   },
-  prevBtnText: { fontSize: 16, fontWeight: '700', color: '#1A1A1A' },
+  prevBtnText: { fontSize: 16, fontWeight: '700' },
   nextBtn: {
-    flex: 2, backgroundColor: '#FF4FA3', borderRadius: 18, paddingVertical: 16,
+    flex: 2, borderRadius: 18, paddingVertical: 16,
     alignItems: 'center',
-    shadowColor: '#FF4FA3', shadowOffset: { width: 0, height: 6 },
+    shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.40, shadowRadius: 14, elevation: 8,
   },
   nextBtnText: { fontSize: 16, fontWeight: '700', color: 'white' },

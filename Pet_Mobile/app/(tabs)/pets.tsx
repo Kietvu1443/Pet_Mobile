@@ -30,12 +30,7 @@ import {
   formatAgeFromBirthDate,
   type UserPet,
 } from '@/lib/api/userPets';
-import {
-  getMockNearbyShelters,
-  type MockShelter,
-} from '@/adapters/mockAdapter';
-
-const NEARBY_SHELTERS: MockShelter[] = getMockNearbyShelters();
+import { InlinePlaceMap } from '@/components/map/InlinePlaceMap';
 
 function EmptyState({ onAdd }: { onAdd: () => void }) {
   const { theme } = useTheme();
@@ -136,6 +131,7 @@ export default function MyPetsScreen() {
   const [pets, setPets] = useState<UserPet[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [parentScrollEnabled, setParentScrollEnabled] = useState(true);
 
   const loadPets = useCallback(async () => {
     try {
@@ -170,6 +166,8 @@ export default function MyPetsScreen() {
         styles.content,
         { paddingTop: insets.top + 16, paddingBottom: 120 },
       ]}
+      scrollEnabled={parentScrollEnabled}
+      nestedScrollEnabled={true}
       showsVerticalScrollIndicator={false}
       refreshControl={
         <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={theme.colors.primary} />
@@ -233,35 +231,30 @@ export default function MyPetsScreen() {
         </>
       )}
 
-      {/* Nearby Shelters */}
-      <View style={[styles.sheltersSection, { marginTop: hasPets ? 16 : 32 }]}>
+      {/* Khám phá gần bạn (Community Places Map) */}
+      <View style={[styles.sheltersSection, { marginTop: hasPets ? 20 : 32 }]}>
         <View style={styles.sheltersSectionHeader}>
-          <Text style={[styles.sheltersSectionTitle, { color: theme.colors.text }]}>Trại gần bạn</Text>
-          <Pressable>
-            <Text style={[styles.sheltersSeeAll, { color: theme.colors.primary }]}>Xem tất cả</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <Ionicons name="map-outline" size={18} color={theme.colors.primary} />
+            <Text style={[styles.sheltersSectionTitle, { color: theme.colors.text }]}>
+              Khám phá gần bạn
+            </Text>
+          </View>
+          <Pressable
+            hitSlop={8}
+            onPress={() => router.push('/places-map' as any)}
+          >
+            <Text style={[styles.sheltersSeeAll, { color: theme.colors.primary }]}>
+              Xem tất cả ↗
+            </Text>
           </Pressable>
         </View>
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={{ gap: 14, paddingBottom: 4 }}
-        >
-          {NEARBY_SHELTERS.map((s) => (
-            <Pressable key={s.name} style={[styles.shelterCard, { backgroundColor: theme.colors.card }]}>
-              <View style={styles.shelterImageWrap}>
-                <Image source={{ uri: s.image }} style={styles.shelterImage} />
-                <View style={styles.shelterDistBadge}>
-                  <Ionicons name="location" size={10} color="white" />
-                  <Text style={styles.shelterDist}>{s.dist}</Text>
-                </View>
-              </View>
-              <View style={styles.shelterInfo}>
-                <Text style={[styles.shelterName, { color: theme.colors.text }]}>{s.name}</Text>
-                <Text style={[styles.shelterPets, { color: theme.colors.muted }]}>{s.pets} bé đang chờ</Text>
-              </View>
-            </Pressable>
-          ))}
-        </ScrollView>
+
+        {/* Inline Map Component */}
+        <InlinePlaceMap
+          onOpenFullscreen={() => router.push('/places-map' as any)}
+          onTouchMap={(isInteracting) => setParentScrollEnabled(!isInteracting)}
+        />
       </View>
     </ScrollView>
   );

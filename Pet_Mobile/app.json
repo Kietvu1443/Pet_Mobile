@@ -53,7 +53,14 @@
       "expo-secure-store",
       "expo-font",
       "@react-native-community/datetimepicker",
-      "expo-localization"
+      "expo-localization",
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Cho phép Pet Helper truy cập vị trí để tìm địa điểm và dịch vụ thú cưng gần bạn."
+        }
+      ],
+      "@maplibre/maplibre-react-native"
     ],
     "experiments": {
       "typedRoutes": true,

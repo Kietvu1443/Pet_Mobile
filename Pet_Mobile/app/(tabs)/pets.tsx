@@ -1,16 +1,18 @@
 // MyPetsScreen — Màn hình Thú cưng của tôi.
 //
 // Nguồn dữ liệu:
-//   - ownPets      <- mockAdapter (TODO: GET /api/v1/pets/my khi backend hỗ trợ)
-//   - nearbyShelters <- mockAdapter (TODO: GET /api/v1/shelters?lat=&lng=)
+//   - ownPets      <- GET /api/v1/user-pets/my (Backend LIVE, cô lập theo user đăng nhập)
+//   - nearbyShelters <- mockAdapter (Gợi ý trại gần bạn)
 //
 // Navigation:
 //   - Thêm thú cưng -> /add-pet
-import { useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useFocusEffect, useRouter } from 'expo-router';
+import { useCallback, useState } from 'react';
 import {
+  ActivityIndicator,
   Image,
   Pressable,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
@@ -22,16 +24,13 @@ import { Ionicons } from '@expo/vector-icons';
 import { useUnreadNotifications } from '@/lib/notifications/unread';
 import { useTranslation } from 'react-i18next';
 import { useTheme } from '@/lib/theme/ThemeContext';
-
+import { resolveImageUrl } from '@/lib/images/resolveUrl';
 import {
-  getMockOwnPets,
-  getMockNearbyShelters,
-  type MockOwnPet,
-  type MockShelter,
-} from '@/adapters/mockAdapter';
-
-const OWN_PETS: MockOwnPet[] = getMockOwnPets();
-const NEARBY_SHELTERS: MockShelter[] = getMockNearbyShelters();
+  fetchMyPets,
+  formatAgeFromBirthDate,
+  type UserPet,
+} from '@/lib/api/userPets';
+import { InlinePlaceMap } from '@/components/map/InlinePlaceMap';
 
 function EmptyState({ onAdd }: { onAdd: () => void }) {
   const { theme } = useTheme();
@@ -43,9 +42,16 @@ function EmptyState({ onAdd }: { onAdd: () => void }) {
       <Text style={[styles.emptyTag, { color: theme.colors.primary }]}>Bắt đầu nào</Text>
       <Text style={[styles.emptyTitle, { color: theme.colors.text }]}>Chưa có thú cưng nào</Text>
       <Text style={[styles.emptyDesc, { color: theme.colors.muted }]}>
-        Thêm thú cưng của bạn để quản lý thông tin và theo dõi các bé dễ dàng hơn.
+        Thêm thú cưng của bạn để quản lý thông tin, theo dõi cân nặng và chăm sóc các bé dễ dàng hơn.
       </Text>
-      <Pressable style={({ pressed }) => [styles.addBigBtn, { backgroundColor: theme.colors.primary, shadowColor: theme.colors.primary }, pressed && { opacity: 0.85 }]} onPress={onAdd}>
+      <Pressable
+        style={({ pressed }) => [
+          styles.addBigBtn,
+          { backgroundColor: theme.colors.primary, shadowColor: theme.colors.primary },
+          pressed && { opacity: 0.85 },
+        ]}
+        onPress={onAdd}
+      >
         <Ionicons name="add" size={20} color="white" />
         <Text style={styles.addBigBtnText}>Thêm thú cưng</Text>
       </Pressable>
@@ -53,32 +59,39 @@ function EmptyState({ onAdd }: { onAdd: () => void }) {
   );
 }
 
-function PetCard({ pet }: { pet: MockOwnPet }) {
+function UserPetCard({ pet, onPress }: { pet: UserPet; onPress: () => void }) {
   const { theme } = useTheme();
-  const [liked, setLiked] = useState(false);
+  const avatarUrl = resolveImageUrl(pet.image_url) || (pet.images && pet.images.length > 0 ? resolveImageUrl(pet.images[0].image_path) : null);
+  const ageDisplay = formatAgeFromBirthDate(pet.birth_date);
+  const genderText = pet.gender === 'male' ? 'Đực' : pet.gender === 'female' ? 'Cái' : '--';
+  const weightText = pet.weight ? `${pet.weight} kg` : '--';
+  const colorText = pet.color || '--';
+  const breedText = pet.breed || (pet.species === 'cat' ? 'Mèo' : pet.species === 'dog' ? 'Chó' : 'Thú cưng');
 
   return (
-    <View style={[styles.petCard, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}>
+    <Pressable
+      style={({ pressed }) => [
+        styles.petCard,
+        { backgroundColor: theme.colors.card, borderColor: theme.colors.border },
+        pressed && { opacity: 0.92, transform: [{ scale: 0.99 }] },
+      ]}
+      onPress={onPress}
+    >
       {/* Image area */}
       <View style={styles.petImageWrap}>
-        <Image source={{ uri: pet.image }} style={styles.petImage} />
+        {avatarUrl ? (
+          <Image source={{ uri: avatarUrl }} style={styles.petImage} resizeMode="cover" />
+        ) : (
+          <View style={[styles.petImagePlaceholder, { backgroundColor: theme.colors.primaryContainer }]}>
+            <Text style={{ fontSize: 60 }}>
+              {pet.species === 'cat' ? '🐱' : pet.species === 'dog' ? '🐶' : '🐾'}
+            </Text>
+          </View>
+        )}
         <View style={styles.petImageGradient} />
 
-        {/* Top-right actions */}
-        <View style={styles.petTopActions}>
-          <Pressable
-            style={[styles.petActionBtn, { backgroundColor: theme.isDark ? 'rgba(30,30,30,0.85)' : 'rgba(255,255,255,0.92)' }]}
-            onPress={() => setLiked((l) => !l)}
-          >
-            <Ionicons name={liked ? 'heart' : 'heart-outline'} size={18} color={liked ? theme.colors.primary : theme.colors.muted} />
-          </Pressable>
-          <Pressable style={[styles.petActionBtn, { backgroundColor: theme.isDark ? 'rgba(30,30,30,0.85)' : 'rgba(255,255,255,0.92)' }]}>
-            <Ionicons name="camera-outline" size={18} color={theme.colors.muted} />
-          </Pressable>
-        </View>
-
         {/* Vaccinated badge */}
-        {pet.vaccinated && (
+        {Boolean(pet.vaccinated) && (
           <View style={[styles.vaccinatedBadge, { backgroundColor: theme.colors.success }]}>
             <Text style={styles.vaccinatedText}>✓ Đã tiêm phòng</Text>
           </View>
@@ -87,34 +100,64 @@ function PetCard({ pet }: { pet: MockOwnPet }) {
         {/* Name overlay */}
         <View style={styles.petNameOverlay}>
           <Text style={styles.petName}>{pet.name}</Text>
-          <Text style={styles.petBreedAge}>{pet.breed} · {pet.age}</Text>
+          <Text style={styles.petBreedAge}>{breedText} · {ageDisplay}</Text>
         </View>
       </View>
 
       {/* Detail chips */}
       <View style={styles.petChipsRow}>
         {[
-          { label: 'Giới tính', value: pet.gender },
-          { label: 'Cân nặng', value: pet.weight },
-          { label: 'Màu lông', value: pet.color },
+          { label: 'Giới tính', value: genderText },
+          { label: 'Cân nặng', value: weightText },
+          { label: 'Màu lông', value: colorText },
         ].map((item) => (
           <View key={item.label} style={[styles.petChip, { backgroundColor: theme.colors.surface }]}>
             <Text style={[styles.petChipLabel, { color: theme.colors.muted }]}>{item.label}</Text>
-            <Text style={[styles.petChipValue, { color: theme.colors.text }]}>{item.value}</Text>
+            <Text style={[styles.petChipValue, { color: theme.colors.text }]} numberOfLines={1}>{item.value}</Text>
           </View>
         ))}
       </View>
-    </View>
+    </Pressable>
   );
 }
 
 export default function MyPetsScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const hasPets = OWN_PETS.length > 0;
   const { t } = useTranslation(['tabs', 'common']);
   const { unread } = useUnreadNotifications();
   const { theme } = useTheme();
+
+  const [pets, setPets] = useState<UserPet[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [parentScrollEnabled, setParentScrollEnabled] = useState(true);
+
+  const loadPets = useCallback(async () => {
+    try {
+      const data = await fetchMyPets();
+      setPets(data);
+    } catch (error) {
+      console.error('Failed to fetch user pets:', error);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, []);
+
+  // Tự động tải lại danh sách mỗi khi màn hình được focus (vd sau khi thêm pet thành công)
+  useFocusEffect(
+    useCallback(() => {
+      loadPets();
+    }, [loadPets])
+  );
+
+  const onRefresh = () => {
+    setRefreshing(true);
+    loadPets();
+  };
+
+  const hasPets = pets.length > 0;
 
   return (
     <ScrollView
@@ -123,16 +166,21 @@ export default function MyPetsScreen() {
         styles.content,
         { paddingTop: insets.top + 16, paddingBottom: 120 },
       ]}
+      scrollEnabled={parentScrollEnabled}
+      nestedScrollEnabled={true}
       showsVerticalScrollIndicator={false}
+      refreshControl={
+        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={theme.colors.primary} />
+      }
     >
       {/* Header */}
       <View style={styles.header}>
         <View>
-          <Text style={[styles.headerTag, { color: theme.colors.primary }]}>Xin chào, Kikiki 👋</Text>
+          <Text style={[styles.headerTag, { color: theme.colors.primary }]}>Quản lý thú cưng</Text>
           <View style={styles.headerTitleRow}>
             <Text style={[styles.headerTitle, { color: theme.colors.text }]}>{t('tabs:pets')}</Text>
             {hasPets && (
-              <Text style={[styles.headerCount, { color: theme.colors.muted }]}>· {OWN_PETS.length} bé</Text>
+              <Text style={[styles.headerCount, { color: theme.colors.muted }]}>· {pets.length} bé</Text>
             )}
           </View>
         </View>
@@ -154,12 +202,20 @@ export default function MyPetsScreen() {
         </View>
       </View>
 
-      {!hasPets ? (
+      {loading && !refreshing ? (
+        <View style={{ paddingVertical: 60, alignItems: 'center' }}>
+          <ActivityIndicator size="large" color={theme.colors.primary} />
+        </View>
+      ) : !hasPets ? (
         <EmptyState onAdd={() => router.push('/add-pet' as Parameters<typeof router.push>[0])} />
       ) : (
         <>
-          {OWN_PETS.map((pet) => (
-            <PetCard key={pet.id} pet={pet} />
+          {pets.map((pet) => (
+            <UserPetCard
+              key={pet.id}
+              pet={pet}
+              onPress={() => router.push({ pathname: '/user-pet/[id]', params: { id: String(pet.id) } })}
+            />
           ))}
 
           {/* Add more dashed button */}
@@ -175,35 +231,30 @@ export default function MyPetsScreen() {
         </>
       )}
 
-      {/* Nearby Shelters */}
-      <View style={[styles.sheltersSection, { marginTop: hasPets ? 8 : 32 }]}>
+      {/* Khám phá gần bạn (Community Places Map) */}
+      <View style={[styles.sheltersSection, { marginTop: hasPets ? 20 : 32 }]}>
         <View style={styles.sheltersSectionHeader}>
-          <Text style={[styles.sheltersSectionTitle, { color: theme.colors.text }]}>Trại gần bạn</Text>
-          <Pressable>
-            <Text style={[styles.sheltersSeeAll, { color: theme.colors.primary }]}>Xem tất cả</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <Ionicons name="map-outline" size={18} color={theme.colors.primary} />
+            <Text style={[styles.sheltersSectionTitle, { color: theme.colors.text }]}>
+              Khám phá gần bạn
+            </Text>
+          </View>
+          <Pressable
+            hitSlop={8}
+            onPress={() => router.push('/places-map' as any)}
+          >
+            <Text style={[styles.sheltersSeeAll, { color: theme.colors.primary }]}>
+              Xem tất cả ↗
+            </Text>
           </Pressable>
         </View>
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={{ gap: 14, paddingBottom: 4 }}
-        >
-          {NEARBY_SHELTERS.map((s) => (
-            <Pressable key={s.name} style={[styles.shelterCard, { backgroundColor: theme.colors.card }]}>
-              <View style={styles.shelterImageWrap}>
-                <Image source={{ uri: s.image }} style={styles.shelterImage} />
-                <View style={styles.shelterDistBadge}>
-                  <Ionicons name="location" size={10} color="white" />
-                  <Text style={styles.shelterDist}>{s.dist}</Text>
-                </View>
-              </View>
-              <View style={styles.shelterInfo}>
-                <Text style={[styles.shelterName, { color: theme.colors.text }]}>{s.name}</Text>
-                <Text style={[styles.shelterPets, { color: theme.colors.muted }]}>{s.pets} bé đang chờ</Text>
-              </View>
-            </Pressable>
-          ))}
-        </ScrollView>
+
+        {/* Inline Map Component */}
+        <InlinePlaceMap
+          onOpenFullscreen={() => router.push('/places-map' as any)}
+          onTouchMap={(isInteracting) => setParentScrollEnabled(!isInteracting)}
+        />
       </View>
     </ScrollView>
   );
@@ -249,28 +300,28 @@ const styles = StyleSheet.create({
   },
   // Empty state
   emptyCard: {
-    borderRadius: 28, padding: 52,
+    borderRadius: 28, padding: 40,
     alignItems: 'center', textAlign: 'center',
     shadowColor: '#000', shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.06, shadowRadius: 16, elevation: 4,
-    borderWidth: 1.5, marginTop: 24,
+    borderWidth: 1.5, marginTop: 12,
   },
   emptyIconWrap: {
     width: 88, height: 88, borderRadius: 44,
     alignItems: 'center', justifyContent: 'center',
-    marginBottom: 24,
+    marginBottom: 20,
   },
   emptyTag: {
     fontSize: 11, fontWeight: '800',
-    letterSpacing: 2, textTransform: 'uppercase', marginBottom: 12,
+    letterSpacing: 2, textTransform: 'uppercase', marginBottom: 10,
   },
   emptyTitle: {
     fontSize: 22, fontWeight: '800',
-    marginBottom: 12, lineHeight: 28,
+    marginBottom: 10, lineHeight: 28, textAlign: 'center',
   },
   emptyDesc: {
     fontSize: 14, lineHeight: 22, textAlign: 'center',
-    maxWidth: 260, marginBottom: 32,
+    maxWidth: 280, marginBottom: 28,
   },
   addBigBtn: {
     flexDirection: 'row', alignItems: 'center', gap: 8,
@@ -290,17 +341,10 @@ const styles = StyleSheet.create({
   },
   petImageWrap: { position: 'relative', height: 240 },
   petImage: { width: '100%', height: '100%' },
+  petImagePlaceholder: { width: '100%', height: '100%', alignItems: 'center', justifyContent: 'center' },
   petImageGradient: {
-    position: 'absolute', bottom: 0, left: 0, right: 0, height: 140,
-    backgroundColor: 'transparent',
-  },
-  petTopActions: {
-    position: 'absolute', top: 16, right: 16,
-    flexDirection: 'row', gap: 8,
-  },
-  petActionBtn: {
-    width: 38, height: 38, borderRadius: 19,
-    alignItems: 'center', justifyContent: 'center',
+    position: 'absolute', bottom: 0, left: 0, right: 0, height: 100,
+    backgroundColor: 'rgba(0,0,0,0.45)',
   },
   vaccinatedBadge: {
     position: 'absolute', top: 16, left: 16,
@@ -309,7 +353,7 @@ const styles = StyleSheet.create({
   vaccinatedText: { color: 'white', fontSize: 12, fontWeight: '600' },
   petNameOverlay: { position: 'absolute', bottom: 16, left: 16 },
   petName: { color: 'white', fontSize: 26, fontWeight: '800', marginBottom: 4 },
-  petBreedAge: { color: 'rgba(255,255,255,0.85)', fontSize: 14 },
+  petBreedAge: { color: 'rgba(255,255,255,0.92)', fontSize: 14, fontWeight: '500' },
   petChipsRow: {
     flexDirection: 'row', gap: 10, padding: 16,
   },
@@ -322,7 +366,7 @@ const styles = StyleSheet.create({
   // Add more
   addMoreBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10,
-    borderWidth: 2, borderStyle: 'dashed', borderRadius: 24, paddingVertical: 20,
+    borderWidth: 2, borderStyle: 'dashed', borderRadius: 24, paddingVertical: 18,
     marginBottom: 12,
   },
   addMoreIcon: {

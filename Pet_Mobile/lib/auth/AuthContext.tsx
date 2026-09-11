@@ -7,7 +7,15 @@
 //   - 401 tập trung -> tự đăng xuất (A3)
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { setUnauthorizedHandler } from '../api/client';
-import { getMe, login as apiLogin, register as apiRegister, type RegisterData, type User } from '../api/auth';
+import {
+  getMe,
+  login as apiLogin,
+  loginWithGoogle as apiLoginWithGoogle,
+  loginWithFacebook as apiLoginWithFacebook,
+  register as apiRegister,
+  type RegisterData,
+  type User,
+} from '../api/auth';
 import { registerDevicePushToken, unregisterDevicePushToken } from '../notifications/device';
 import { resetGlobalUnread } from '../notifications/unread';
 import { clearToken, getToken, saveToken } from './tokenStore';
@@ -17,6 +25,8 @@ type AuthContextValue = {
   isAuthenticated: boolean;
   isBootstrapping: boolean;
   login: (displayName: string, password: string) => Promise<void>;
+  loginWithGoogle: (token: string) => Promise<void>;
+  loginWithFacebook: (accessToken: string) => Promise<void>;
   register: (data: RegisterData) => Promise<void>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
@@ -83,6 +93,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const me = await getMe();
         setUser(me);
         void registerDevicePushToken().catch(err => console.warn('[Push] Login registration failed:', err));
+      },
+      loginWithGoogle: async (token: string) => {
+        const result = await apiLoginWithGoogle(token);
+        await saveToken(result.token);
+        const me = await getMe();
+        setUser(me);
+        void registerDevicePushToken().catch(err => console.warn('[Push] Google login registration failed:', err));
+      },
+      loginWithFacebook: async (accessToken: string) => {
+        const result = await apiLoginWithFacebook(accessToken);
+        await saveToken(result.token);
+        const me = await getMe();
+        setUser(me);
+        void registerDevicePushToken().catch(err => console.warn('[Push] Facebook login registration failed:', err));
       },
       register: async (data: RegisterData) => {
         const result = await apiRegister(data);

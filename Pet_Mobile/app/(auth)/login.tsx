@@ -22,6 +22,12 @@ import {
   View,
 } from "react-native";
 import { Circle, Ellipse, Path, Svg } from "react-native-svg";
+import Constants from "expo-constants";
+import {
+  GoogleSignin,
+  statusCodes,
+} from "@react-native-google-signin/google-signin";
+import { LoginManager, AccessToken } from "react-native-fbsdk-next";
 
 import { ApiError } from "@/lib/api/client";
 import { useAuth } from "@/lib/auth/AuthContext";
@@ -239,14 +245,25 @@ function InputPill({
 // ─── Component chính ──────────────────────────────────────────────────────────
 export default function LoginScreen() {
   const { theme } = useTheme();
-  const { login } = useAuth();
+  const { login, loginWithGoogle, loginWithFacebook } = useAuth();
   const router = useRouter();
   const [displayName, setDisplayName] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [oauthLoading, setOauthLoading] = useState<"google" | "facebook" | null>(null);
   const [error, setError] = useState("");
   const [isKeyboardVisible, setKeyboardVisible] = useState(false);
+
+  useEffect(() => {
+    const webClientId =
+      Constants.expoConfig?.extra?.googleWebClientId ??
+      "30133692717-p7pekroj13sd0c7nrsia71l24hrj2m25.apps.googleusercontent.com";
+    GoogleSignin.configure({
+      webClientId,
+      offlineAccess: false,
+    });
+  }, []);
 
   useEffect(() => {
     const showSub = Keyboard.addListener(
@@ -264,7 +281,10 @@ export default function LoginScreen() {
   }, []);
 
   const canSubmit =
-    displayName.trim().length > 0 && password.length > 0 && !submitting;
+    displayName.trim().length > 0 &&
+    password.length > 0 &&
+    !submitting &&
+    oauthLoading === null;
 
   async function handleSubmit() {
     if (!canSubmit) return;
@@ -280,6 +300,81 @@ export default function LoginScreen() {
       setError(message);
     } finally {
       setSubmitting(false);
+    }
+  }
+
+  async function handleGoogleLogin() {
+    if (submitting || oauthLoading !== null) return;
+    setOauthLoading("google");
+    setError("");
+    try {
+      await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
+      const response = await GoogleSignin.signIn();
+      if (response.type === "cancelled") {
+        return;
+      }
+      const idToken = response.data?.idToken;
+      if (!idToken) {
+        throw new Error("Không nhận được Google idToken hợp lệ");
+      }
+      await loginWithGoogle(idToken);
+    } catch (e: any) {
+      if (
+        e?.code === statusCodes.SIGN_IN_CANCELLED ||
+        e?.code === "12501" ||
+        e?.message?.includes?.("12501")
+      ) {
+        // Người dùng chủ động hủy hoặc bấm back -> reset bình thường
+        return;
+      }
+      if (e?.code === statusCodes.IN_PROGRESS) {
+        return;
+      }
+      if (e?.code === statusCodes.PLAY_SERVICES_NOT_AVAILABLE) {
+        setError("Thiết bị chưa có hoặc cần cập nhật Google Play Services");
+        return;
+      }
+      if (e?.code === "10" || e?.message?.includes?.("DEVELOPER_ERROR")) {
+        setError("Lỗi cấu hình Google Sign-In (SHA-1 hoặc Client ID chưa khớp)");
+        console.warn("[Google Sign-In DEVELOPER_ERROR]:", e);
+        return;
+      }
+      const message =
+        e instanceof ApiError
+          ? e.message
+          : e?.message || "Đăng nhập Google thất bại, vui lòng thử lại";
+      setError(message);
+    } finally {
+      setOauthLoading(null);
+    }
+  }
+
+  async function handleFacebookLogin() {
+    if (submitting || oauthLoading !== null) return;
+    setOauthLoading("facebook");
+    setError("");
+    try {
+      LoginManager.logOut();
+      const result = await LoginManager.logInWithPermissions([
+        "public_profile",
+        "email",
+      ]);
+      if (result.isCancelled) {
+        return;
+      }
+      const data = await AccessToken.getCurrentAccessToken();
+      if (!data || !data.accessToken) {
+        throw new Error("Không lấy được accessToken từ Facebook");
+      }
+      await loginWithFacebook(data.accessToken);
+    } catch (e: any) {
+      const message =
+        e instanceof ApiError
+          ? e.message
+          : e?.message || "Đăng nhập Facebook thất bại, vui lòng thử lại";
+      setError(message);
+    } finally {
+      setOauthLoading(null);
     }
   }
 
@@ -406,18 +501,44 @@ export default function LoginScreen() {
         </View>
 
         <View style={styles.socialRow}>
-          <TouchableOpacity style={styles.socialBtn} activeOpacity={0.8}>
-            <Ionicons name="logo-google" size={20} color="#4285F4" />
-            <Text style={styles.socialBtnText}>Google</Text>
+          <TouchableOpacity
+            style={[
+              styles.socialBtn,
+              (submitting || oauthLoading !== null) && styles.socialBtnDisabled,
+            ]}
+            activeOpacity={0.8}
+            onPress={handleGoogleLogin}
+            disabled={submitting || oauthLoading !== null}
+          >
+            {oauthLoading === "google" ? (
+              <ActivityIndicator size="small" color="#4285F4" />
+            ) : (
+              <>
+                <Ionicons name="logo-google" size={20} color="#4285F4" />
+                <Text style={styles.socialBtnText}>Google</Text>
+              </>
+            )}
           </TouchableOpacity>
           <TouchableOpacity
-            style={[styles.socialBtn, styles.socialBtnFb]}
+            style={[
+              styles.socialBtn,
+              styles.socialBtnFb,
+              (submitting || oauthLoading !== null) && styles.socialBtnDisabled,
+            ]}
             activeOpacity={0.8}
+            onPress={handleFacebookLogin}
+            disabled={submitting || oauthLoading !== null}
           >
-            <Ionicons name="logo-facebook" size={20} color="#fff" />
-            <Text style={[styles.socialBtnText, styles.socialBtnTextFb]}>
-              Facebook
-            </Text>
+            {oauthLoading === "facebook" ? (
+              <ActivityIndicator size="small" color="#fff" />
+            ) : (
+              <>
+                <Ionicons name="logo-facebook" size={20} color="#fff" />
+                <Text style={[styles.socialBtnText, styles.socialBtnTextFb]}>
+                  Facebook
+                </Text>
+              </>
+            )}
           </TouchableOpacity>
         </View>
 
@@ -664,6 +785,9 @@ const styles = StyleSheet.create({
   socialBtnFb: {
     backgroundColor: "#1877F2",
     borderColor: "#1877F2",
+  },
+  socialBtnDisabled: {
+    opacity: 0.6,
   },
   socialBtnText: {
     fontFamily: "Fredoka_600SemiBold",

@@ -26,7 +26,7 @@ export type User = {
   preferences?: { quickRole?: string; pushEnabled?: boolean; emailEnabled?: boolean } | null;
 };
 
-type LoginResponse = {
+export type LoginResponse = {
   token: string;
   user: User;
 };
@@ -46,6 +46,24 @@ export function login(displayName: string, password: string): Promise<LoginRespo
     method: 'POST',
     auth: false,
     body: { display_name: displayName, password },
+  });
+}
+
+// POST /api/v1/auth/google — trả về { token, user } xác thực qua Google idToken.
+export function loginWithGoogle(token: string): Promise<LoginResponse> {
+  return apiRequest<LoginResponse>('/auth/google', {
+    method: 'POST',
+    auth: false,
+    body: { token },
+  });
+}
+
+// POST /api/v1/auth/facebook — trả về { token, user } xác thực qua Facebook accessToken.
+export function loginWithFacebook(accessToken: string): Promise<LoginResponse> {
+  return apiRequest<LoginResponse>('/auth/facebook', {
+    method: 'POST',
+    auth: false,
+    body: { accessToken },
   });
 }
 
@@ -73,3 +91,4 @@ export async function getMe(signal?: AbortSignal): Promise<User> {
   const data = await apiRequest<MeResponse>('/auth/me', { signal });
   return data.user;
 }
+

@@ -17,6 +17,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialIcons, Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { createPlace, PlaceType, PLACE_CATEGORIES } from '../lib/api/places';
+import { SafeMapView, Marker } from '../components/map/SafeMapView';
 import {
   safeRequestLocationPermission,
   safeGetCurrentPosition,

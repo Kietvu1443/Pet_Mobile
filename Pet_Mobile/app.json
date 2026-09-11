@@ -60,7 +60,16 @@
           "locationAlwaysAndWhenInUsePermission": "Cho phép Pet Helper truy cập vị trí để tìm địa điểm và dịch vụ thú cưng gần bạn."
         }
       ],
-      "@maplibre/maplibre-react-native"
+      "@maplibre/maplibre-react-native",
+      [
+        "react-native-fbsdk-next",
+        {
+          "appID": "1503663617874402",
+          "clientToken": "9b2416f83f1248d3820bceede9535012",
+          "displayName": "Pet Helper",
+          "scheme": "fb1503663617874402"
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,
@@ -68,6 +77,8 @@
     },
     "extra": {
       "apiBaseUrl": "https://pethelper.app",
+      "googleWebClientId": "30133692717-p7pekroj13sd0c7nrsia71l24hrj2m25.apps.googleusercontent.com",
+      "facebookAppId": "1503663617874402",
       "router": {},
       "eas": {
         "projectId": "5f36dc03-d98b-4505-8708-2337a838999e"

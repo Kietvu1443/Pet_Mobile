@@ -240,14 +240,24 @@ export default function MyPetsScreen() {
               Khám phá gần bạn
             </Text>
           </View>
-          <Pressable
-            hitSlop={8}
-            onPress={() => router.push('/places-map' as any)}
-          >
-            <Text style={[styles.sheltersSeeAll, { color: theme.colors.primary }]}>
-              Xem tất cả ↗
-            </Text>
-          </Pressable>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+            <Pressable
+              hitSlop={8}
+              onPress={() => router.push('/add-place' as any)}
+            >
+              <Text style={[styles.sheltersSeeAll, { color: theme.colors.primary, fontWeight: '700' }]}>
+                + Đóng góp
+              </Text>
+            </Pressable>
+            <Pressable
+              hitSlop={8}
+              onPress={() => router.push('/places-map' as any)}
+            >
+              <Text style={[styles.sheltersSeeAll, { color: theme.colors.primary }]}>
+                Xem tất cả ↗
+              </Text>
+            </Pressable>
+          </View>
         </View>
 
         {/* Inline Map Component */}

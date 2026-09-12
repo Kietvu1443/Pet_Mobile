@@ -51,7 +51,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const me = await getMe();
         if (mounted) {
           setUser(me);
-          void registerDevicePushToken().catch(err => console.warn('[Push] Startup registration failed:', err));
+          void registerDevicePushToken(me?.preferences?.pushEnabled !== false).catch(err => console.warn('[Push] Startup registration failed:', err));
         }
       } catch {
         // Token hỏng/hết hạn -> xoá phiên (A3).
@@ -92,21 +92,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // /auth/login returns a subset; fetch full profile from /auth/me
         const me = await getMe();
         setUser(me);
-        void registerDevicePushToken().catch(err => console.warn('[Push] Login registration failed:', err));
+        void registerDevicePushToken(me?.preferences?.pushEnabled !== false).catch(err => console.warn('[Push] Login registration failed:', err));
       },
       loginWithGoogle: async (token: string) => {
         const result = await apiLoginWithGoogle(token);
         await saveToken(result.token);
         const me = await getMe();
         setUser(me);
-        void registerDevicePushToken().catch(err => console.warn('[Push] Google login registration failed:', err));
+        void registerDevicePushToken(me?.preferences?.pushEnabled !== false).catch(err => console.warn('[Push] Google login registration failed:', err));
       },
       loginWithFacebook: async (accessToken: string) => {
         const result = await apiLoginWithFacebook(accessToken);
         await saveToken(result.token);
         const me = await getMe();
         setUser(me);
-        void registerDevicePushToken().catch(err => console.warn('[Push] Facebook login registration failed:', err));
+        void registerDevicePushToken(me?.preferences?.pushEnabled !== false).catch(err => console.warn('[Push] Facebook login registration failed:', err));
       },
       register: async (data: RegisterData) => {
         const result = await apiRegister(data);
@@ -114,7 +114,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // /auth/register returns a subset; fetch full profile from /auth/me
         const me = await getMe();
         setUser(me);
-        void registerDevicePushToken().catch(err => console.warn('[Push] Register registration failed:', err));
+        void registerDevicePushToken(me?.preferences?.pushEnabled !== false).catch(err => console.warn('[Push] Register registration failed:', err));
       },
       logout: async () => {
         await unregisterDevicePushToken().catch(err => console.warn('[Push] Logout unregistration failed:', err));

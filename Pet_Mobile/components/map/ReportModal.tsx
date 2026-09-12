@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -45,6 +45,14 @@ export function ReportModal({
   const [description, setDescription] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (visible) {
+      setSelectedReason('incorrect_info');
+      setDescription('');
+      setError(null);
+    }
+  }, [visible]);
 
   const handleSubmit = async () => {
     try {

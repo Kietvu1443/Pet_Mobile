@@ -1,7 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   FlatList,
   Pressable,
   StyleSheet,
@@ -18,6 +17,7 @@ import { updateGlobalUnread, useUnreadNotifications } from '@/lib/notifications/
 import { navigateFromNotification } from '@/lib/notifications/device';
 import { NotificationData, NotificationItem } from '@/components/NotificationItem';
 import { useTheme } from '@/lib/theme/ThemeContext';
+import { AppDialog, AppDialogProps } from '@/components/ui/AppDialog';
 
 // In-memory 30s cache variables
 let cacheData: NotificationData[] = [];
@@ -44,6 +44,7 @@ export default function NotificationCenterScreen() {
   const [hasMore, setHasMore] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [retryCount, setRetryCount] = useState(0);
+  const [dialogConfig, setDialogConfig] = useState<AppDialogProps | null>(null);
 
   const fetchingRef = useRef<number | null>(null);
 
@@ -138,32 +139,41 @@ export default function NotificationCenterScreen() {
 
   // Mark all as read
   const handleMarkAllRead = useCallback(() => {
-    Alert.alert(
-      'Đánh dấu đã đọc',
-      'Bạn muốn đánh dấu tất cả thông báo là đã đọc?',
-      [
-        { text: 'Hủy', style: 'cancel' },
-        {
-          text: 'Đánh dấu',
-          onPress: async () => {
-            try {
-              await apiRequest('/notifications/read-all', { method: 'PATCH' });
-              
-              // Map state and cache immediately
-              setNotifications((prev) =>
-                prev.map((n) => ({ ...n, is_read: 1 }))
-              );
-              cacheData = cacheData.map((n) => ({ ...n, is_read: 1 }));
-              
-              // Zero out badge immediately
-              updateGlobalUnread(0);
-            } catch (err: any) {
-              Alert.alert('Lỗi', err.message || 'Không thể cập nhật trạng thái thông báo.');
-            }
-          },
-        },
-      ]
-    );
+    setDialogConfig({
+      visible: true,
+      variant: 'confirm',
+      iconName: 'mail-open-outline',
+      title: 'Đánh dấu đã đọc',
+      message: 'Bạn có chắc chắn muốn đánh dấu tất cả thông báo là đã đọc không?',
+      confirmText: 'Đánh dấu tất cả',
+      cancelText: 'Hủy',
+      onConfirm: async () => {
+        try {
+          await apiRequest('/notifications/read-all', { method: 'PATCH' });
+
+          // Map state and cache immediately
+          setNotifications((prev) =>
+            prev.map((n) => ({ ...n, is_read: 1 }))
+          );
+          cacheData = cacheData.map((n) => ({ ...n, is_read: 1 }));
+
+          // Zero out badge immediately
+          updateGlobalUnread(0);
+          setDialogConfig(null);
+        } catch (err: any) {
+          setDialogConfig({
+            visible: true,
+            variant: 'error',
+            title: 'Lỗi',
+            message: err?.message || 'Không thể cập nhật trạng thái thông báo.',
+            singleButton: true,
+            confirmText: 'Đã hiểu',
+            onConfirm: () => setDialogConfig(null),
+          });
+        }
+      },
+      onCancel: () => setDialogConfig(null),
+    });
   }, []);
 
   // Item tap handler
@@ -347,6 +357,21 @@ export default function NotificationCenterScreen() {
           removeClippedSubviews={true}
         />
       )}
+
+      {/* Standard AppDialog */}
+      <AppDialog
+        visible={Boolean(dialogConfig?.visible)}
+        title={dialogConfig?.title || ''}
+        message={dialogConfig?.message}
+        variant={dialogConfig?.variant}
+        iconName={dialogConfig?.iconName}
+        confirmText={dialogConfig?.confirmText}
+        cancelText={dialogConfig?.cancelText}
+        singleButton={dialogConfig?.singleButton}
+        loading={dialogConfig?.loading}
+        onConfirm={dialogConfig?.onConfirm}
+        onCancel={dialogConfig?.onCancel || (() => setDialogConfig(null))}
+      />
     </View>
   );
 }

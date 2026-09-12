@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -8,22 +8,30 @@ import {
   Pressable,
   Image,
   ActivityIndicator,
-  Alert,
   KeyboardAvoidingView,
   Platform,
+  Keyboard,
+  type LayoutChangeEvent,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialIcons, Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
-import { createPlace, PlaceType, PLACE_CATEGORIES } from '../lib/api/places';
-import { SafeMapView, Marker } from '../components/map/SafeMapView';
+import { createPlace, PlaceType, PLACE_CATEGORIES, invalidatePlacesQueries } from '../lib/api/places';
+import { SafeMapView, Marker, type SafeMapViewRef } from '../components/map/SafeMapView';
 import {
-  safeRequestLocationPermission,
   safeGetCurrentPosition,
+  safeGetFastLocation,
+  calculateDistanceMeters,
   safeReverseGeocode,
   DEFAULT_HCMC_COORDS,
 } from '../lib/location/safeLocation';
+import { AppDialog, AppDialogProps } from '../components/ui/AppDialog';
+import {
+  checkLocationPermission,
+  requestLocationPermission,
+  openAppSettings,
+} from '../lib/permissions/permissionService';
 
 const CATEGORY_KEYS: PlaceType[] = [
   'shelter',
@@ -39,12 +47,19 @@ const CATEGORY_KEYS: PlaceType[] = [
 export default function AddPlaceScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const mapRef = useRef<SafeMapViewRef>(null);
+  const scrollViewRef = useRef<ScrollView>(null);
+  const fieldPositions = useRef<Record<string, number>>({});
+  const lastGeocodedCoords = useRef<{ latitude: number; longitude: number } | null>(null);
+  const params = useLocalSearchParams<{ lat?: string; lng?: string }>();
+  const initialLat = params.lat ? parseFloat(params.lat) : null;
+  const initialLng = params.lng ? parseFloat(params.lng) : null;
 
   const [name, setName] = useState('');
   const [selectedType, setSelectedType] = useState<PlaceType>('other');
   const [address, setAddress] = useState('');
-  const [latitude, setLatitude] = useState<number>(DEFAULT_HCMC_COORDS.latitude);
-  const [longitude, setLongitude] = useState<number>(DEFAULT_HCMC_COORDS.longitude);
+  const [latitude, setLatitude] = useState<number>(initialLat ?? DEFAULT_HCMC_COORDS.latitude);
+  const [longitude, setLongitude] = useState<number>(initialLng ?? DEFAULT_HCMC_COORDS.longitude);
   const [phone, setPhone] = useState('');
   const [website, setWebsite] = useState('');
   const [description, setDescription] = useState('');
@@ -53,29 +68,80 @@ export default function AddPlaceScreen() {
   const [loadingGps, setLoadingGps] = useState<boolean>(false);
   const [submitting, setSubmitting] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+  const [dialogConfig, setDialogConfig] = useState<AppDialogProps | null>(null);
 
   useEffect(() => {
-    fetchCurrentGps();
-  }, []);
-
-  const fetchCurrentGps = async () => {
-    try {
-      setLoadingGps(true);
-      const perm = await safeRequestLocationPermission();
-      if (perm.granted) {
-        const coords = await safeGetCurrentPosition();
-        if (coords) {
+    if (initialLat && initialLng) {
+      setLatitude(initialLat);
+      setLongitude(initialLng);
+      mapRef.current?.flyTo({ latitude: initialLat, longitude: initialLng }, 15);
+      safeReverseGeocode({ latitude: initialLat, longitude: initialLng })
+        .then((geoAddress) => {
+          if (geoAddress && !address) {
+            setAddress(geoAddress);
+          }
+        })
+        .catch(() => {});
+    } else {
+      // Khởi tạo im lặng không bật popup native
+      safeGetFastLocation(false).then((fastRes) => {
+        if (fastRes.status === 'SUCCESS' && fastRes.location) {
+          const coords = fastRes.location;
           setLatitude(coords.latitude);
           setLongitude(coords.longitude);
+          mapRef.current?.flyTo(coords, 15);
+          safeReverseGeocode(coords)
+            .then((geoAddress) => {
+              if (geoAddress) {
+                setAddress(geoAddress);
+                lastGeocodedCoords.current = coords;
+              }
+            })
+            .catch(() => {});
+        }
+      });
+    }
+  }, [initialLat, initialLng]);
 
-          // Reverse geocoding để gợi ý địa chỉ tự động nếu chưa có
-          try {
-            const geoAddress = await safeReverseGeocode(coords);
+  const executeFetchGps = async () => {
+    try {
+      setLoadingGps(true);
+
+      const fastRes = await safeGetFastLocation(true);
+      if (fastRes.status === 'SUCCESS' && fastRes.location) {
+        const coords = fastRes.location;
+        setLatitude(coords.latitude);
+        setLongitude(coords.longitude);
+        mapRef.current?.flyTo(coords, 15);
+        safeReverseGeocode(coords)
+          .then((geoAddress) => {
             if (geoAddress && !address) {
               setAddress(geoAddress);
+              lastGeocodedCoords.current = coords;
             }
-          } catch (_) {}
-        }
+          })
+          .catch(() => {});
+      }
+
+      const coords = await safeGetCurrentPosition(true);
+      if (coords) {
+        setLatitude(coords.latitude);
+        setLongitude(coords.longitude);
+        mapRef.current?.flyTo(coords, 15);
+
+        try {
+          const shouldGeocode =
+            !lastGeocodedCoords.current ||
+            calculateDistanceMeters(lastGeocodedCoords.current, coords) > 30;
+
+          if (shouldGeocode) {
+            const geoAddress = await safeReverseGeocode(coords);
+            if (geoAddress) {
+              setAddress(geoAddress);
+              lastGeocodedCoords.current = coords;
+            }
+          }
+        } catch (_) {}
       }
     } catch (e) {
       console.log('[AddPlace] Location error:', e);
@@ -84,7 +150,47 @@ export default function AddPlaceScreen() {
     }
   };
 
-  const handlePickImage = async () => {
+  const handleUseCurrentGps = async () => {
+    const hasPerm = await checkLocationPermission();
+    if (!hasPerm) {
+      setDialogConfig({
+        visible: true,
+        variant: 'permission',
+        iconName: 'navigate-circle-outline',
+        title: 'Quyền truy cập vị trí',
+        message: 'Ứng dụng cần quyền vị trí để tự động lấy tọa độ GPS chính xác cho địa điểm thú cưng.',
+        confirmText: 'Cho phép',
+        cancelText: 'Để sau',
+        onConfirm: async () => {
+          setDialogConfig(null);
+          const req = await requestLocationPermission();
+          if (req.granted) {
+            executeFetchGps();
+          } else if (!req.canAskAgain) {
+            setDialogConfig({
+              visible: true,
+              variant: 'warning',
+              iconName: 'settings-outline',
+              title: 'Cần cấp quyền trong Cài đặt',
+              message: 'Quyền vị trí đã bị từ chối. Vui lòng mở Cài đặt thiết bị để cho phép Pet Helper sử dụng vị trí.',
+              confirmText: 'Mở Cài đặt',
+              cancelText: 'Đóng',
+              onConfirm: () => {
+                setDialogConfig(null);
+                openAppSettings();
+              },
+              onCancel: () => setDialogConfig(null),
+            });
+          }
+        },
+        onCancel: () => setDialogConfig(null),
+      });
+      return;
+    }
+    executeFetchGps();
+  };
+
+  const pickImage = async () => {
     try {
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ['images'],
@@ -101,20 +207,64 @@ export default function AddPlaceScreen() {
     }
   };
 
+  const handlePickImage = () => {
+    pickImage();
+  };
+
   const handleMapPress = (coordsOrEvent: any) => {
+    let lat: number | null = null;
+    let lng: number | null = null;
     if (coordsOrEvent?.latitude && coordsOrEvent?.longitude) {
-      setLatitude(coordsOrEvent.latitude);
-      setLongitude(coordsOrEvent.longitude);
-      return;
+      lat = coordsOrEvent.latitude;
+      lng = coordsOrEvent.longitude;
+    } else if (coordsOrEvent?.nativeEvent?.coordinate) {
+      lat = coordsOrEvent.nativeEvent.coordinate.latitude;
+      lng = coordsOrEvent.nativeEvent.coordinate.longitude;
     }
-    const coords = coordsOrEvent?.nativeEvent?.coordinate;
-    if (coords) {
-      setLatitude(coords.latitude);
-      setLongitude(coords.longitude);
+    if (lat !== null && lng !== null) {
+      const newCoords = { latitude: lat, longitude: lng };
+      setLatitude(lat);
+      setLongitude(lng);
+      mapRef.current?.easeTo(newCoords, 15);
+
+      // Chỉ reverse geocode nếu vị trí ghim mới cách vị trí cũ > 30m
+      const shouldGeocode =
+        !lastGeocodedCoords.current ||
+        calculateDistanceMeters(lastGeocodedCoords.current, newCoords) > 30;
+
+      if (shouldGeocode) {
+        safeReverseGeocode(newCoords)
+          .then((geoAddress) => {
+            if (geoAddress) {
+              setAddress(geoAddress);
+              lastGeocodedCoords.current = newCoords;
+            }
+          })
+          .catch(() => {});
+      }
     }
   };
 
+  const handleFieldLayout = (key: string) => (event: LayoutChangeEvent) => {
+    fieldPositions.current[key] = event.nativeEvent.layout.y;
+  };
+
+  const scrollToField = (key: string, extraOffset = 0) => {
+    setTimeout(() => {
+      const y = fieldPositions.current[key];
+      if (typeof y === 'number') {
+        scrollViewRef.current?.scrollTo({
+          y: Math.max(0, y - 20 + extraOffset),
+          animated: true,
+        });
+      } else if (key === 'description') {
+        scrollViewRef.current?.scrollToEnd({ animated: true });
+      }
+    }, Platform.OS === 'ios' ? 120 : 180);
+  };
+
   const handleSubmit = async () => {
+    Keyboard.dismiss();
     if (!name.trim()) {
       setError('Vui lòng nhập tên địa điểm');
       return;
@@ -152,16 +302,22 @@ export default function AddPlaceScreen() {
 
       await createPlace(formData);
 
-      Alert.alert(
-        'Đã gửi địa điểm! ⏳',
-        'Địa điểm của bạn đã được gửi thành công và đang chờ ban quản trị kiểm duyệt trước khi hiển thị trên bản đồ công khai.',
-        [
-          {
-            text: 'Đồng ý',
-            onPress: () => router.back(),
-          },
-        ]
-      );
+      // Invalidate TanStack Query để các màn hình map/list tự động nạp lại danh sách mới
+      invalidatePlacesQueries();
+
+      setDialogConfig({
+        visible: true,
+        variant: 'success',
+        iconName: 'checkmark-circle-outline',
+        title: 'Đã gửi địa điểm! ⏳',
+        message: 'Địa điểm của bạn đã được gửi thành công và đang chờ ban quản trị kiểm duyệt trước khi hiển thị trên bản đồ công khai.',
+        confirmText: 'Đồng ý',
+        singleButton: true,
+        onConfirm: () => {
+          setDialogConfig(null);
+          router.back();
+        },
+      });
     } catch (err: any) {
       setError(err?.message || 'Đã xảy ra lỗi khi tạo địa điểm. Vui lòng thử lại.');
     } finally {
@@ -171,7 +327,7 @@ export default function AddPlaceScreen() {
 
   return (
     <KeyboardAvoidingView
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       style={[styles.screen, { paddingTop: insets.top }]}
     >
       {/* Header */}
@@ -184,7 +340,11 @@ export default function AddPlaceScreen() {
       </View>
 
       <ScrollView
-        contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 40 }]}
+        ref={scrollViewRef}
+        style={styles.scrollView}
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 80 }]}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="interactive"
         showsVerticalScrollIndicator={false}
       >
         {/* Banner Chọn Ảnh */}
@@ -200,13 +360,14 @@ export default function AddPlaceScreen() {
         </Pressable>
 
         {/* Tên địa điểm */}
-        <View style={styles.fieldGroup}>
+        <View style={styles.fieldGroup} onLayout={handleFieldLayout('name')}>
           <Text style={styles.fieldLabel}>
             Tên địa điểm <Text style={styles.requiredMark}>*</Text>
           </Text>
           <TextInput
             value={name}
             onChangeText={setName}
+            onFocus={() => scrollToField('name')}
             placeholder="Ví dụ: Bệnh viện Thú y PetCare, Cà phê Mèo..."
             placeholderTextColor="#94A3B8"
             style={styles.textInput}
@@ -251,13 +412,14 @@ export default function AddPlaceScreen() {
         </View>
 
         {/* Địa chỉ */}
-        <View style={styles.fieldGroup}>
+        <View style={styles.fieldGroup} onLayout={handleFieldLayout('address')}>
           <Text style={styles.fieldLabel}>
             Địa chỉ cụ thể <Text style={styles.requiredMark}>*</Text>
           </Text>
           <TextInput
             value={address}
             onChangeText={setAddress}
+            onFocus={() => scrollToField('address')}
             placeholder="Số nhà, tên đường, phường, quận, thành phố..."
             placeholderTextColor="#94A3B8"
             style={styles.textInput}
@@ -271,7 +433,7 @@ export default function AddPlaceScreen() {
               Vị trí tọa độ GPS <Text style={styles.requiredMark}>*</Text>
             </Text>
             <Pressable
-              onPress={fetchCurrentGps}
+              onPress={handleUseCurrentGps}
               disabled={loadingGps}
               style={({ pressed }) => [styles.gpsBtn, pressed && { opacity: 0.8 }]}
             >
@@ -291,9 +453,10 @@ export default function AddPlaceScreen() {
 
           <View style={styles.miniMapWrap}>
             <SafeMapView
+              ref={mapRef}
               height={180}
               initialCenter={{ latitude, longitude }}
-              initialZoom={14}
+              initialZoom={15}
               onMapPress={handleMapPress}
             >
               <Marker
@@ -313,12 +476,13 @@ export default function AddPlaceScreen() {
         </View>
 
         {/* Số điện thoại & Website */}
-        <View style={styles.rowTwoFields}>
+        <View style={styles.rowTwoFields} onLayout={handleFieldLayout('phoneWeb')}>
           <View style={[styles.fieldGroup, { flex: 1 }]}>
             <Text style={styles.fieldLabel}>Số hotline</Text>
             <TextInput
               value={phone}
               onChangeText={setPhone}
+              onFocus={() => scrollToField('phoneWeb')}
               placeholder="0901234567"
               placeholderTextColor="#94A3B8"
               keyboardType="phone-pad"
@@ -330,20 +494,23 @@ export default function AddPlaceScreen() {
             <TextInput
               value={website}
               onChangeText={setWebsite}
+              onFocus={() => scrollToField('phoneWeb')}
               placeholder="https://..."
               placeholderTextColor="#94A3B8"
               autoCapitalize="none"
+              keyboardType="url"
               style={styles.textInput}
             />
           </View>
         </View>
 
         {/* Mô tả */}
-        <View style={styles.fieldGroup}>
+        <View style={styles.fieldGroup} onLayout={handleFieldLayout('description')}>
           <Text style={styles.fieldLabel}>Mô tả / Dịch vụ cung cấp</Text>
           <TextInput
             value={description}
             onChangeText={setDescription}
+            onFocus={() => scrollToField('description', 30)}
             placeholder="Thông tin thêm về dịch vụ, tiện ích cho thú cưng..."
             placeholderTextColor="#94A3B8"
             multiline
@@ -372,6 +539,21 @@ export default function AddPlaceScreen() {
           )}
         </Pressable>
       </ScrollView>
+
+      {/* Standard AppDialog */}
+      <AppDialog
+        visible={Boolean(dialogConfig?.visible)}
+        title={dialogConfig?.title || ''}
+        message={dialogConfig?.message}
+        variant={dialogConfig?.variant}
+        iconName={dialogConfig?.iconName}
+        confirmText={dialogConfig?.confirmText}
+        cancelText={dialogConfig?.cancelText}
+        singleButton={dialogConfig?.singleButton}
+        loading={dialogConfig?.loading}
+        onConfirm={dialogConfig?.onConfirm}
+        onCancel={dialogConfig?.onCancel || (() => setDialogConfig(null))}
+      />
     </KeyboardAvoidingView>
   );
 }
@@ -380,6 +562,9 @@ const styles = StyleSheet.create({
   screen: {
     flex: 1,
     backgroundColor: '#FFFFFF',
+  },
+  scrollView: {
+    flex: 1,
   },
   header: {
     flexDirection: 'row',

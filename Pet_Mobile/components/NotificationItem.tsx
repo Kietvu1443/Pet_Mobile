@@ -73,6 +73,20 @@ export const NOTIFICATION_META: Record<string, NotificationMetaConfig> = {
     bg: '#E8F4FF',
     route: '/(tabs)/profile',
   },
+  PLACE_APPROVED: {
+    priority: 'success',
+    icon: 'location-outline',
+    color: '#34C759',
+    bg: '#E8F8EE',
+    route: '/places-map',
+  },
+  PLACE_REJECTED: {
+    priority: 'critical',
+    icon: 'location-outline',
+    color: '#FF4D4F',
+    bg: '#FFF0F0',
+    route: '/places-map',
+  },
   // Backward compatibility legacy support
   return_workflow: {
     priority: 'warning',

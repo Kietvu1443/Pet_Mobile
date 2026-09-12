@@ -8,7 +8,6 @@ import {
   Image,
   ActivityIndicator,
   Linking,
-  Alert,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -21,15 +20,20 @@ import {
   deletePlaceReview,
   openDirectionsInMaps,
   PLACE_CATEGORIES,
+  updatePlacesCacheAfterReview,
+  invalidatePlacesQueries,
 } from '../../lib/api/places';
 import { resolveImageUrl } from '../../lib/images/resolveUrl';
 import { PlaceReviewModal } from '../../components/map/PlaceReviewModal';
 import { ReportModal } from '../../components/map/ReportModal';
+import { useAuth } from '../../lib/auth/AuthContext';
+import { AppDialog, AppDialogProps } from '../../components/ui/AppDialog';
 
 export default function PlaceDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { isAuthenticated } = useAuth();
 
   const [place, setPlace] = useState<Place | null>(null);
   const [myReview, setMyReview] = useState<PlaceReview | null>(null);
@@ -39,9 +43,52 @@ export default function PlaceDetailScreen() {
 
   const [reviewModalVisible, setReviewModalVisible] = useState<boolean>(false);
   const [reportModalVisible, setReportModalVisible] = useState<boolean>(false);
+  const [dialogConfig, setDialogConfig] = useState<AppDialogProps | null>(null);
+
+  const handleOpenReview = () => {
+    if (!isAuthenticated) {
+      setDialogConfig({
+        visible: true,
+        variant: 'warning',
+        iconName: 'lock-closed-outline',
+        title: 'Yêu cầu đăng nhập',
+        message: 'Vui lòng đăng nhập tài khoản để đánh giá và bình luận địa điểm.',
+        confirmText: 'Đăng nhập',
+        cancelText: 'Để sau',
+        onConfirm: () => {
+          setDialogConfig(null);
+          router.push('/(auth)/login' as any);
+        },
+        onCancel: () => setDialogConfig(null),
+      });
+      return;
+    }
+    setReviewModalVisible(true);
+  };
+
+  const handleOpenReport = () => {
+    if (!isAuthenticated) {
+      setDialogConfig({
+        visible: true,
+        variant: 'warning',
+        iconName: 'lock-closed-outline',
+        title: 'Yêu cầu đăng nhập',
+        message: 'Vui lòng đăng nhập tài khoản để gửi báo cáo vi phạm.',
+        confirmText: 'Đăng nhập',
+        cancelText: 'Để sau',
+        onConfirm: () => {
+          setDialogConfig(null);
+          router.push('/(auth)/login' as any);
+        },
+        onCancel: () => setDialogConfig(null),
+      });
+      return;
+    }
+    setReportModalVisible(true);
+  };
 
   const loadData = useCallback(async () => {
-    if (!id) return;
+    if (!id) return null;
     try {
       setLoading(true);
       setError(null);
@@ -54,9 +101,11 @@ export default function PlaceDetailScreen() {
       setPlace(detailRes.place);
       setMyReview(detailRes.my_review);
       setReviews(reviewsRes.reviews || []);
+      return detailRes;
     } catch (err: any) {
       console.error('[PlaceDetail] Load error:', err);
       setError(err?.message || 'Không thể tải thông tin địa điểm.');
+      return null;
     } finally {
       setLoading(false);
     }
@@ -84,22 +133,44 @@ export default function PlaceDetailScreen() {
 
   const handleDeleteMyReview = () => {
     if (!place) return;
-    Alert.alert('Xóa đánh giá', 'Bạn có chắc chắn muốn xóa đánh giá của mình?', [
-      { text: 'Hủy', style: 'cancel' },
-      {
-        text: 'Xóa',
-        style: 'destructive',
-        onPress: async () => {
-          try {
-            await deletePlaceReview(place.id);
-            setMyReview(null);
-            loadData();
-          } catch (e: any) {
-            Alert.alert('Lỗi', e?.message || 'Không thể xóa đánh giá');
+    setDialogConfig({
+      visible: true,
+      variant: 'destructive',
+      iconName: 'trash-outline',
+      title: 'Xóa đánh giá',
+      message: 'Bạn có chắc chắn muốn xóa đánh giá của mình? Hành động này không thể hoàn tác.',
+      confirmText: 'Xóa đánh giá',
+      cancelText: 'Hủy',
+      onConfirm: async () => {
+        try {
+          await deletePlaceReview(place.id);
+          setMyReview(null);
+          const fresh = await loadData();
+          if (fresh?.place) {
+            updatePlacesCacheAfterReview(
+              fresh.place.id,
+              fresh.place.rating_avg,
+              fresh.place.review_count,
+              null as any
+            );
+          } else {
+            invalidatePlacesQueries();
           }
-        },
+          setDialogConfig(null);
+        } catch (e: any) {
+          setDialogConfig({
+            visible: true,
+            variant: 'error',
+            title: 'Lỗi',
+            message: e?.message || 'Không thể xóa đánh giá. Vui lòng thử lại.',
+            singleButton: true,
+            confirmText: 'Đã hiểu',
+            onConfirm: () => setDialogConfig(null),
+          });
+        }
       },
-    ]);
+      onCancel: () => setDialogConfig(null),
+    });
   };
 
   if (loading) {
@@ -117,9 +188,14 @@ export default function PlaceDetailScreen() {
         <MaterialIcons name="error-outline" size={48} color="#EF4444" />
         <Text style={styles.errorTitle}>Không tìm thấy địa điểm</Text>
         <Text style={styles.errorDesc}>{error || 'Địa điểm có thể đã bị xóa hoặc không tồn tại.'}</Text>
-        <Pressable onPress={() => router.back()} style={styles.backBtn}>
-          <Text style={styles.backBtnText}>Quay lại</Text>
-        </Pressable>
+        <View style={{ flexDirection: 'row', gap: 12, marginTop: 8 }}>
+          <Pressable onPress={() => router.back()} style={styles.backBtn}>
+            <Text style={styles.backBtnText}>Quay lại</Text>
+          </Pressable>
+          <Pressable onPress={() => loadData()} style={[styles.backBtn, { backgroundColor: '#00220F' }]}>
+            <Text style={[styles.backBtnText, { color: '#FFFFFF' }]}>Thử lại</Text>
+          </Pressable>
+        </View>
       </View>
     );
   }
@@ -154,7 +230,7 @@ export default function PlaceDetailScreen() {
             </Pressable>
 
             <Pressable
-              onPress={() => setReportModalVisible(true)}
+              onPress={handleOpenReport}
               hitSlop={12}
               style={({ pressed }) => [styles.circleBtn, pressed && { opacity: 0.8 }]}
             >
@@ -206,7 +282,7 @@ export default function PlaceDetailScreen() {
             </Pressable>
 
             <Pressable
-              onPress={() => setReviewModalVisible(true)}
+              onPress={handleOpenReview}
               style={({ pressed }) => [styles.secondaryActionBtn, pressed && { opacity: 0.88 }]}
             >
               <MaterialIcons name="rate-review" size={18} color="#00220F" />
@@ -354,9 +430,28 @@ export default function PlaceDetailScreen() {
           initialRating={myReview?.rating || 5}
           initialComment={myReview?.comment || ''}
           onClose={() => setReviewModalVisible(false)}
-          onSuccess={(newAvg, newCount) => {
-            setPlace((prev) => (prev ? { ...prev, rating_avg: newAvg, review_count: newCount } : prev));
-            loadData();
+          onSuccess={async () => {
+            const fresh = await loadData();
+            if (fresh?.place) {
+              updatePlacesCacheAfterReview(
+                fresh.place.id,
+                fresh.place.rating_avg,
+                fresh.place.review_count,
+                fresh.my_review || undefined
+              );
+            } else {
+              invalidatePlacesQueries();
+            }
+            setDialogConfig({
+              visible: true,
+              variant: 'success',
+              iconName: 'star-outline',
+              title: 'Thành công 🌟',
+              message: 'Cảm ơn bạn đã gửi đánh giá cho địa điểm này!',
+              singleButton: true,
+              confirmText: 'Đã hiểu',
+              onConfirm: () => setDialogConfig(null),
+            });
           }}
         />
       )}
@@ -370,10 +465,34 @@ export default function PlaceDetailScreen() {
           targetName={place.name}
           onClose={() => setReportModalVisible(false)}
           onSuccess={() => {
-            Alert.alert('Thành công', 'Báo cáo vi phạm đã được gửi tới quản trị viên để kiểm duyệt.');
+            setDialogConfig({
+              visible: true,
+              variant: 'success',
+              iconName: 'checkmark-circle-outline',
+              title: 'Đã gửi báo cáo',
+              message: 'Báo cáo vi phạm đã được gửi tới quản trị viên để kiểm duyệt.',
+              singleButton: true,
+              confirmText: 'Đã hiểu',
+              onConfirm: () => setDialogConfig(null),
+            });
           }}
         />
       )}
+
+      {/* Standard AppDialog */}
+      <AppDialog
+        visible={Boolean(dialogConfig?.visible)}
+        title={dialogConfig?.title || ''}
+        message={dialogConfig?.message}
+        variant={dialogConfig?.variant}
+        iconName={dialogConfig?.iconName}
+        confirmText={dialogConfig?.confirmText}
+        cancelText={dialogConfig?.cancelText}
+        singleButton={dialogConfig?.singleButton}
+        loading={dialogConfig?.loading}
+        onConfirm={dialogConfig?.onConfirm}
+        onCancel={dialogConfig?.onCancel || (() => setDialogConfig(null))}
+      />
     </View>
   );
 }

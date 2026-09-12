@@ -2,7 +2,6 @@ import { useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -19,6 +18,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { apiRequest } from "@/lib/api/client";
 import { useAuth } from "@/lib/auth/AuthContext";
 import { useTheme } from "@/lib/theme/ThemeContext";
+import { AppDialog, AppDialogProps } from "@/components/ui/AppDialog";
 
 type ShelterStatus = "unsubmitted" | "pending" | "approved" | "rejected";
 
@@ -80,6 +80,9 @@ export default function ShelterRegistrationScreen() {
 
   const [loading, setLoading] = useState(true);
   const [existingId, setExistingId] = useState<number | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [rejectReason, setRejectReason] = useState<string | null>(null);
+  const [dialogConfig, setDialogConfig] = useState<AppDialogProps | null>(null);
   const [shelterStatus, setShelterStatus] =
     useState<ShelterStatus>("unsubmitted");
   const [adminNotes, setAdminNotes] = useState<string | null>(null);
@@ -88,7 +91,6 @@ export default function ShelterRegistrationScreen() {
   const [phone, setPhone] = useState("");
   const [address, setAddress] = useState("");
   const [description, setDescription] = useState("");
-  const [saving, setSaving] = useState(false);
 
   const isEditable =
     shelterStatus === "unsubmitted" || shelterStatus === "rejected";
@@ -141,10 +143,15 @@ export default function ShelterRegistrationScreen() {
       await refreshUser();
       router.back();
     } catch (e) {
-      Alert.alert(
-        "Lỗi",
-        e instanceof Error ? e.message : "Không thể lưu thông tin trại",
-      );
+      setDialogConfig({
+        visible: true,
+        variant: "error",
+        title: "Lỗi",
+        message: e instanceof Error ? e.message : "Không thể lưu thông tin trại",
+        singleButton: true,
+        confirmText: "Đã hiểu",
+        onConfirm: () => setDialogConfig(null),
+      });
     } finally {
       setSaving(false);
     }
@@ -500,6 +507,21 @@ export default function ShelterRegistrationScreen() {
           </Pressable>
         )}
       </View>
+
+      {/* Standard AppDialog */}
+      <AppDialog
+        visible={Boolean(dialogConfig?.visible)}
+        title={dialogConfig?.title || ""}
+        message={dialogConfig?.message}
+        variant={dialogConfig?.variant}
+        iconName={dialogConfig?.iconName}
+        confirmText={dialogConfig?.confirmText}
+        cancelText={dialogConfig?.cancelText}
+        singleButton={dialogConfig?.singleButton}
+        loading={dialogConfig?.loading}
+        onConfirm={dialogConfig?.onConfirm}
+        onCancel={dialogConfig?.onCancel || (() => setDialogConfig(null))}
+      />
     </Animated.View>
   );
 }

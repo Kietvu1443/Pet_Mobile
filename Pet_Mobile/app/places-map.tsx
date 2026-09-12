@@ -8,17 +8,31 @@ import {
   FlatList,
   Image,
   Dimensions,
-  Alert,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialIcons, Ionicons } from '@expo/vector-icons';
-import { Place, PlaceType, fetchNearbyPlaces, PLACE_CATEGORIES } from '../lib/api/places';
+import { useQueryClient } from '@tanstack/react-query';
+import { AppDialog, AppDialogProps } from '../components/ui/AppDialog';
+import {
+  checkLocationPermission,
+  requestLocationPermission,
+  openAppSettings,
+} from '../lib/permissions/permissionService';
+import {
+  Place,
+  PlaceType,
+  fetchNearbyPlaces,
+  PLACE_CATEGORIES,
+  placeQueryKeys,
+} from '../lib/api/places';
 import { CustomPlaceMarker } from '../components/map/CustomPlaceMarker';
 import { resolveImageUrl } from '../lib/images/resolveUrl';
 import { SafeMapView, type SafeMapViewRef } from '../components/map/SafeMapView';
 import {
   safeGetUserLocation,
+  safeGetFastLocation,
+  calculateDistanceMeters,
   DEFAULT_MAP_CENTER,
   SafeCoords,
 } from '../lib/location/safeLocation';
@@ -42,65 +56,159 @@ const FILTER_TYPES: { id: 'all' | PlaceType; label: string; icon: string }[] = [
 export default function PlacesMapScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const queryClient = useQueryClient();
   const mapRef = useRef<SafeMapViewRef>(null);
   const flatListRef = useRef<FlatList>(null);
   const hasCenteredOnce = useRef<boolean>(false);
+  const hasUserInteractedWithMap = useRef<boolean>(false);
+  const selectedPlaceRef = useRef<Place | null>(null);
+  const placesRef = useRef<Place[]>([]);
+  const fetchSeqRef = useRef<number>(0);
+  const queryLocationRef = useRef<SafeCoords | null>(null);
 
   const [userLocation, setUserLocation] = useState<SafeCoords | null>(null);
+  const [queryLocation, setQueryLocation] = useState<SafeCoords | null>(null);
   const [places, setPlaces] = useState<Place[]>([]);
   const [selectedType, setSelectedType] = useState<'all' | PlaceType>('all');
   const [selectedPlace, setSelectedPlace] = useState<Place | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [isLocating, setIsLocating] = useState<boolean>(false);
   const [hasLocationPermission, setHasLocationPermission] = useState<boolean>(false);
+  const [dialogConfig, setDialogConfig] = useState<AppDialogProps | null>(null);
 
-  const loadPlaces = useCallback(async (typeFilter: 'all' | PlaceType, loc: SafeCoords | null) => {
-    try {
-      setLoading(true);
-      const queryCoords = loc || DEFAULT_MAP_CENTER;
-      const res = await fetchNearbyPlaces({
-        lat: queryCoords.latitude,
-        lng: queryCoords.longitude,
-        radius: 30,
-        type: typeFilter !== 'all' ? typeFilter : undefined,
-        limit: 50,
-      });
+  useEffect(() => {
+    selectedPlaceRef.current = selectedPlace;
+  }, [selectedPlace]);
 
-      // Nếu không có GPS thực tế, loại bỏ distance_km để tránh tính sai khoảng cách từ trung tâm
-      const sanitized = loc ? res : res.map((p) => ({ ...p, distance_km: null }));
-      setPlaces(sanitized);
+  useEffect(() => {
+    placesRef.current = places;
+  }, [places]);
 
-      if (sanitized.length > 0) {
-        setSelectedPlace((prev) => {
-          if (prev && sanitized.some((p) => p.id === prev.id)) return prev;
-          return sanitized[0];
+  useEffect(() => {
+    queryLocationRef.current = queryLocation;
+  }, [queryLocation]);
+
+  const loadPlaces = useCallback(
+    async (typeFilter: 'all' | PlaceType, loc: SafeCoords | null, isSilent = false) => {
+      const seq = ++fetchSeqRef.current;
+      try {
+        if (!isSilent) setLoading(true);
+        setLoadError(null);
+        const queryCoords = loc || DEFAULT_MAP_CENTER;
+
+        // Ưu tiên đọc từ TanStack Query cache nếu có
+        const cached = queryClient.getQueryData<Place[]>(
+          placeQueryKeys.nearby({
+            lat: queryCoords.latitude,
+            lng: queryCoords.longitude,
+            type: typeFilter !== 'all' ? typeFilter : undefined,
+          })
+        );
+        if (cached && cached.length > 0 && placesRef.current.length === 0) {
+          setPlaces(cached);
+          setSelectedPlace((prev) => prev || cached[0]);
+        }
+
+        const res = await fetchNearbyPlaces({
+          lat: queryCoords.latitude,
+          lng: queryCoords.longitude,
+          radius: 30,
+          type: typeFilter !== 'all' ? typeFilter : undefined,
+          limit: 50,
         });
-      } else {
-        setSelectedPlace(null);
-      }
-    } catch (e) {
-      console.log('[PlacesMap] Load places error:', e);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
 
+        // Bỏ qua nếu có request mới hơn (ngăn race conditions)
+        if (fetchSeqRef.current !== seq) return;
+
+        // Nếu không có GPS thực tế, loại bỏ distance_km để tránh tính sai khoảng cách từ trung tâm
+        const sanitized = loc ? res : res.map((p) => ({ ...p, distance_km: null }));
+        setPlaces(sanitized);
+
+        // Lưu vào TanStack Query cache
+        queryClient.setQueryData(
+          placeQueryKeys.nearby({
+            lat: queryCoords.latitude,
+            lng: queryCoords.longitude,
+            type: typeFilter !== 'all' ? typeFilter : undefined,
+          }),
+          sanitized
+        );
+
+        if (sanitized.length > 0) {
+          setSelectedPlace((prev) => {
+            if (prev) {
+              const matched = sanitized.find((p) => p.id === prev.id);
+              if (matched) return matched;
+            }
+            return sanitized[0];
+          });
+        } else {
+          setSelectedPlace(null);
+        }
+      } catch (e: any) {
+        console.log('[PlacesMap] Load places error:', e);
+        if (placesRef.current.length === 0 && fetchSeqRef.current === seq) {
+          setLoadError(e?.message || 'Không thể tải danh sách địa điểm. Vui lòng kiểm tra kết nối mạng.');
+        }
+      } finally {
+        if (fetchSeqRef.current === seq) {
+          setLoading(false);
+        }
+      }
+    },
+    [queryClient]
+  );
+
+  // GIAI ĐOẠN ĐỊNH VỊ: 2-stage fast location (Không block UI, tuân thủ Camera an toàn)
   useEffect(() => {
     let isMounted = true;
     (async () => {
       try {
-        const res = await safeGetUserLocation();
+        // Giai đoạn 1: Lấy ngay vị trí cache / last-known
+        const fastRes = await safeGetFastLocation();
         if (!isMounted) return;
 
-        setHasLocationPermission(res.permissionGranted);
-        if (res.status === 'SUCCESS' && res.location) {
-          setUserLocation(res.location);
-
-          // Chỉ di chuyển camera tới vị trí người dùng MỘT LẦN DUY NHẤT khi khởi tạo
+        setHasLocationPermission(fastRes.permissionGranted);
+        if (fastRes.status === 'SUCCESS' && fastRes.location) {
+          setUserLocation(fastRes.location);
+          setQueryLocation((prev) => prev || fastRes.location);
           if (!hasCenteredOnce.current && mapRef.current) {
             hasCenteredOnce.current = true;
-            mapRef.current.flyTo(res.location, 14);
+            mapRef.current.flyTo(fastRes.location, 14);
           }
+        } else {
+          setQueryLocation((prev) => prev || DEFAULT_MAP_CENTER);
+        }
+
+        // Giai đoạn 2: Lấy fresh GPS ở background song song
+        const freshRes = await safeGetUserLocation();
+        if (!isMounted) return;
+
+        setHasLocationPermission(freshRes.permissionGranted);
+        if (freshRes.status === 'SUCCESS' && freshRes.location) {
+          const freshLoc = freshRes.location;
+
+          // QUY TẮC CAMERA AN TOÀN:
+          // Tuyệt đối không tự động di chuyển camera nếu user đang xem vị trí khác hoặc đang tương tác với map!
+          if (!hasCenteredOnce.current && !hasUserInteractedWithMap.current && selectedPlaceRef.current === null) {
+            hasCenteredOnce.current = true;
+            mapRef.current?.flyTo(freshLoc, 14);
+          }
+
+          setUserLocation(freshLoc);
+
+          // Cập nhật queryLocation nếu người dùng chưa chuyển sang xem địa điểm mẫu (vẫn đang bám theo GPS)
+          setQueryLocation((prev) => {
+            if (!prev) return freshLoc;
+            const isAtSampleCenter =
+              Math.abs(prev.latitude - DEFAULT_MAP_CENTER.latitude) < 0.001 &&
+              Math.abs(prev.longitude - DEFAULT_MAP_CENTER.longitude) < 0.001;
+            if (isAtSampleCenter) return prev;
+
+            const hasSignificantMove = calculateDistanceMeters(prev, freshLoc) > 50;
+            return hasSignificantMove ? freshLoc : prev;
+          });
         }
       } catch (e) {
         console.log('[PlacesMap] Init location error:', e);
@@ -112,11 +220,57 @@ export default function PlacesMapScreen() {
     };
   }, []);
 
+  // Screen Focus: Khi quay lại từ Place Detail hoặc Add Place, silently sync với Query Cache & backend
+  useFocusEffect(
+    useCallback(() => {
+      // Đồng bộ ngay từ cache nếu có mutation vừa diễn ra
+      const cached = queryClient.getQueriesData<Place[]>({ queryKey: ['places', 'nearby'] });
+      if (cached && cached.length > 0) {
+        setPlaces((prevPlaces) => {
+          if (prevPlaces.length === 0) return prevPlaces;
+          let hasChange = false;
+          const updated = prevPlaces.map((p) => {
+            for (const [, cacheList] of cached) {
+              if (Array.isArray(cacheList)) {
+                const item = cacheList.find((c) => c.id === p.id);
+                if (item && (item.rating_avg !== p.rating_avg || item.review_count !== p.review_count)) {
+                  hasChange = true;
+                  return { ...p, rating_avg: item.rating_avg, review_count: item.review_count };
+                }
+              }
+            }
+            return p;
+          });
+          return hasChange ? updated : prevPlaces;
+        });
+
+        // Đồng bộ cả selectedPlace nếu đang trúng địa điểm được cập nhật
+        if (selectedPlaceRef.current) {
+          const selId = selectedPlaceRef.current.id;
+          for (const [, cacheList] of cached) {
+            if (Array.isArray(cacheList)) {
+              const item = cacheList.find((c) => c.id === selId);
+              if (item) {
+                setSelectedPlace((prev) =>
+                  prev ? { ...prev, rating_avg: item.rating_avg, review_count: item.review_count } : prev
+                );
+              }
+            }
+          }
+        }
+      }
+
+      // Silent background refetch từ backend để đồng bộ tuyệt đối
+      loadPlaces(selectedType, queryLocationRef.current, true);
+    }, [selectedType, loadPlaces, queryClient])
+  );
+
   useEffect(() => {
-    loadPlaces(selectedType, userLocation);
-  }, [selectedType, userLocation, loadPlaces]);
+    loadPlaces(selectedType, queryLocation);
+  }, [selectedType, queryLocation, loadPlaces]);
 
   const handleSelectPlace = (place: Place, index?: number) => {
+    hasUserInteractedWithMap.current = true;
     setSelectedPlace(place);
     if (mapRef.current) {
       mapRef.current.flyTo(
@@ -132,51 +286,133 @@ export default function PlacesMapScreen() {
     }
   };
 
-  const handleCenterUser = async () => {
-    if (isLocating) return;
-
-    if (userLocation) {
-      mapRef.current?.flyTo(userLocation, 14);
-      return;
-    }
-
+  const fetchAndCenterUser = async () => {
     setIsLocating(true);
     try {
-      // Nếu chưa có vị trí, thử xin quyền và lấy lại GPS
-      const res = await safeGetUserLocation();
+      const res = await safeGetUserLocation(true);
       setHasLocationPermission(res.permissionGranted);
 
       if (res.status === 'SUCCESS' && res.location) {
         setUserLocation(res.location);
+        setQueryLocation(res.location);
         mapRef.current?.flyTo(res.location, 14);
+      } else if (res.status === 'SERVICES_DISABLED') {
+        setDialogConfig({
+          visible: true,
+          variant: 'warning',
+          iconName: 'location-outline',
+          title: 'Dịch vụ vị trí đang tắt',
+          message: 'Dịch vụ vị trí (GPS) của thiết bị đang tắt. Vui lòng bật định vị trong cài đặt điện thoại.',
+          confirmText: 'Mở Cài đặt',
+          cancelText: 'Đóng',
+          onConfirm: () => {
+            setDialogConfig(null);
+            openAppSettings();
+          },
+          onCancel: () => setDialogConfig(null),
+        });
+      } else if (res.status === 'TIMEOUT') {
+        setDialogConfig({
+          visible: true,
+          variant: 'info',
+          iconName: 'time-outline',
+          title: 'Chưa nhận được GPS',
+          message: 'Tín hiệu GPS chưa phản hồi kịp thời. Vui lòng thử lại hoặc di chuyển ra khu vực thông thoáng hơn.',
+          singleButton: true,
+          confirmText: 'Đã hiểu',
+          onConfirm: () => setDialogConfig(null),
+        });
       } else {
-        if (res.status === 'PERMISSION_DENIED') {
-          Alert.alert(
-            'Quyền truy cập vị trí',
-            'Ứng dụng cần quyền vị trí để hiển thị các địa điểm thú cưng gần bạn. Vui lòng cấp quyền trong Cài đặt thiết bị.'
-          );
-        } else if (res.status === 'SERVICES_DISABLED') {
-          Alert.alert(
-            'Dịch vụ vị trí đang tắt',
-            'Dịch vụ vị trí của thiết bị đang tắt. Vui lòng bật định vị (GPS) trong cài đặt điện thoại.'
-          );
-        } else if (res.status === 'TIMEOUT') {
-          Alert.alert(
-            'Chưa nhận được GPS',
-            'Tín hiệu GPS chưa phản hồi. Vui lòng thử lại hoặc di chuyển ra khu vực thông thoáng hơn.'
-          );
-        } else {
-          Alert.alert(
-            'Chưa hỗ trợ GPS trên bản build này',
-            'Ứng dụng trên điện thoại hiện đang chạy bản build chưa có native module ExpoLocation. Cần build lại app (npx expo run:android hoặc EAS Build) để sử dụng GPS.'
-          );
-        }
+        setDialogConfig({
+          visible: true,
+          variant: 'error',
+          iconName: 'alert-circle-outline',
+          title: 'Không thể lấy vị trí',
+          message: res.errorMessage || 'Không thể xác định vị trí hiện tại của thiết bị.',
+          singleButton: true,
+          confirmText: 'Đã hiểu',
+          onConfirm: () => setDialogConfig(null),
+        });
       }
     } catch (e) {
       console.log('[PlacesMap] Center user error:', e);
     } finally {
       setIsLocating(false);
     }
+  };
+
+  const handleCenterUser = async () => {
+    hasUserInteractedWithMap.current = false;
+    if (isLocating) return;
+
+    if (userLocation) {
+      setQueryLocation(userLocation);
+      mapRef.current?.flyTo(userLocation, 14);
+      return;
+    }
+
+    const hasPerm = await checkLocationPermission();
+    if (!hasPerm) {
+      setDialogConfig({
+        visible: true,
+        variant: 'permission',
+        iconName: 'navigate-circle-outline',
+        title: 'Quyền truy cập vị trí',
+        message: 'Ứng dụng cần quyền vị trí để định vị vị trí hiện tại và gợi ý các địa điểm thú cưng gần bạn nhất.',
+        confirmText: 'Cho phép',
+        cancelText: 'Để sau',
+        onConfirm: async () => {
+          setDialogConfig(null);
+          const req = await requestLocationPermission();
+          if (req.granted) {
+            fetchAndCenterUser();
+          } else if (!req.canAskAgain) {
+            setDialogConfig({
+              visible: true,
+              variant: 'warning',
+              iconName: 'settings-outline',
+              title: 'Cần cấp quyền trong Cài đặt',
+              message: 'Quyền vị trí đã bị từ chối. Vui lòng mở Cài đặt thiết bị để cho phép Pet Helper sử dụng vị trí.',
+              confirmText: 'Mở Cài đặt',
+              cancelText: 'Đóng',
+              onConfirm: () => {
+                setDialogConfig(null);
+                openAppSettings();
+              },
+              onCancel: () => setDialogConfig(null),
+            });
+          }
+        },
+        onCancel: () => setDialogConfig(null),
+      });
+      return;
+    }
+
+    fetchAndCenterUser();
+  };
+
+  const handleMapLongPress = (coords: { latitude: number; longitude: number }) => {
+    hasUserInteractedWithMap.current = true;
+    setDialogConfig({
+      visible: true,
+      variant: 'confirm',
+      iconName: 'location-outline',
+      title: 'Đóng góp địa điểm 📍',
+      message: 'Bạn có muốn thêm địa điểm thú cưng mới tại vị trí vừa chọn trên bản đồ không?',
+      confirmText: 'Thêm địa điểm',
+      cancelText: 'Hủy',
+      onConfirm: () => {
+        setDialogConfig(null);
+        router.push({
+          pathname: '/add-place',
+          params: {
+            lat: String(coords.latitude),
+            lng: String(coords.longitude),
+          },
+        } as any);
+      },
+      onCancel: () => setDialogConfig(null),
+    });
   };
 
   return (
@@ -188,8 +424,15 @@ export default function PlacesMapScreen() {
         userLocation={userLocation}
         selectedPlace={selectedPlace}
         onSelectPlace={handleSelectPlace}
+        onTouchMap={() => {
+          hasUserInteractedWithMap.current = true;
+        }}
+        onMapPress={() => {
+          hasUserInteractedWithMap.current = true;
+        }}
+        onMapLongPress={handleMapLongPress}
         attributionStyle={{ bottom: 180 }}
-        onRetry={() => loadPlaces(selectedType, userLocation)}
+        onRetry={() => loadPlaces(selectedType, queryLocation)}
       />
 
       {/* Top Floating Bar */}
@@ -205,22 +448,36 @@ export default function PlacesMapScreen() {
 
           <Text style={styles.topBarTitle}>Khám phá gần bạn</Text>
 
-          <Pressable
-            onPress={handleCenterUser}
-            hitSlop={12}
-            disabled={isLocating}
-            style={({ pressed }) => [styles.floatingCircleBtn, pressed && { opacity: 0.8 }]}
-          >
-            {isLocating ? (
-              <ActivityIndicator size="small" color="#00220F" />
-            ) : (
-              <MaterialIcons
-                name={hasLocationPermission && userLocation ? 'my-location' : 'location-searching'}
-                size={20}
-                color={userLocation ? '#16A34A' : '#00220F'}
-              />
-            )}
-          </Pressable>
+          <View style={styles.topRightActions}>
+            <Pressable
+              onPress={handleCenterUser}
+              hitSlop={12}
+              disabled={isLocating}
+              style={({ pressed }) => [styles.floatingCircleBtn, pressed && { opacity: 0.8 }]}
+            >
+              {isLocating ? (
+                <ActivityIndicator size="small" color="#00220F" />
+              ) : (
+                <MaterialIcons
+                  name={hasLocationPermission && userLocation ? 'my-location' : 'location-searching'}
+                  size={20}
+                  color={userLocation ? '#16A34A' : '#00220F'}
+                />
+              )}
+            </Pressable>
+
+            <Pressable
+              onPress={() => router.push('/add-place' as any)}
+              hitSlop={12}
+              style={({ pressed }) => [
+                styles.floatingCircleBtn,
+                styles.topAddBtn,
+                pressed && { opacity: 0.8 },
+              ]}
+            >
+              <Ionicons name="add" size={22} color="#FFFFFF" />
+            </Pressable>
+          </View>
         </View>
 
         {/* Category Filter Chips */}
@@ -264,7 +521,7 @@ export default function PlacesMapScreen() {
         onPress={() => router.push('/add-place' as any)}
         style={({ pressed }) => [
           styles.addPlaceFab,
-          { bottom: insets.bottom + 170 },
+          { bottom: insets.bottom + 235 },
           pressed && { opacity: 0.88, transform: [{ scale: 0.96 }] },
         ]}
       >
@@ -282,7 +539,19 @@ export default function PlacesMapScreen() {
 
       {/* Bottom Places Carousel */}
       <View style={[styles.bottomCarouselContainer, { bottom: insets.bottom + 16 }]} pointerEvents="box-none">
-        {places.length === 0 && !loading ? (
+        {loadError && places.length === 0 ? (
+          <View style={styles.emptyCarouselCard}>
+            <MaterialIcons name="wifi-off" size={24} color="#EF4444" />
+            <Text style={styles.emptyCarouselText}>{loadError}</Text>
+            <Pressable
+              onPress={() => loadPlaces(selectedType, queryLocation)}
+              style={({ pressed }) => [styles.exploreHcmcBtn, pressed && { opacity: 0.85 }]}
+            >
+              <MaterialIcons name="refresh" size={15} color="#FFFFFF" />
+              <Text style={styles.exploreHcmcBtnText}>Thử lại</Text>
+            </Pressable>
+          </View>
+        ) : places.length === 0 && !loading ? (
           <View style={styles.emptyCarouselCard}>
             <MaterialIcons name="location-off" size={24} color="#94A3B8" />
             <Text style={styles.emptyCarouselText}>
@@ -290,7 +559,8 @@ export default function PlacesMapScreen() {
             </Text>
             <Pressable
               onPress={() => {
-                loadPlaces(selectedType, DEFAULT_MAP_CENTER);
+                hasUserInteractedWithMap.current = true;
+                setQueryLocation(DEFAULT_MAP_CENTER);
                 mapRef.current?.flyTo(DEFAULT_MAP_CENTER, 13);
               }}
               style={({ pressed }) => [styles.exploreHcmcBtn, pressed && { opacity: 0.85 }]}
@@ -309,6 +579,17 @@ export default function PlacesMapScreen() {
             snapToInterval={CARD_WIDTH + 14}
             decelerationRate="fast"
             contentContainerStyle={styles.carouselContent}
+            onMomentumScrollEnd={(e) => {
+              const contentOffset = e.nativeEvent.contentOffset.x;
+              const index = Math.round(contentOffset / (CARD_WIDTH + 14));
+              if (index >= 0 && index < places.length) {
+                const activePlace = places[index];
+                if (selectedPlaceRef.current?.id !== activePlace.id) {
+                  setSelectedPlace(activePlace);
+                  hasUserInteractedWithMap.current = true;
+                }
+              }
+            }}
             renderItem={({ item, index }) => {
               const meta = PLACE_CATEGORIES[item.type as PlaceType] || PLACE_CATEGORIES.other;
               const isSelected = selectedPlace?.id === item.id;
@@ -377,6 +658,21 @@ export default function PlacesMapScreen() {
           />
         )}
       </View>
+
+      {/* Standard AppDialog */}
+      <AppDialog
+        visible={Boolean(dialogConfig?.visible)}
+        title={dialogConfig?.title || ''}
+        message={dialogConfig?.message}
+        variant={dialogConfig?.variant}
+        iconName={dialogConfig?.iconName}
+        confirmText={dialogConfig?.confirmText}
+        cancelText={dialogConfig?.cancelText}
+        singleButton={dialogConfig?.singleButton}
+        loading={dialogConfig?.loading}
+        onConfirm={dialogConfig?.onConfirm}
+        onCancel={dialogConfig?.onCancel || (() => setDialogConfig(null))}
+      />
     </View>
   );
 }
@@ -429,6 +725,14 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 4,
   },
+  topRightActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  topAddBtn: {
+    backgroundColor: '#00220F',
+  },
   filterList: {
     gap: 8,
     paddingVertical: 2,
@@ -472,8 +776,8 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.25,
     shadowRadius: 6,
-    elevation: 6,
-    zIndex: 10,
+    elevation: 8,
+    zIndex: 40,
   },
   addPlaceFabText: {
     color: '#FFFFFF',

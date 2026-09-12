@@ -4,6 +4,8 @@ import React, {
   useRef,
   useImperativeHandle,
   forwardRef,
+  useEffect,
+  useCallback,
 } from 'react';
 import {
   View,
@@ -112,6 +114,8 @@ export interface SafeMapViewProps {
   selectedPlace?: Place | null;
   onSelectPlace?: (place: Place) => void;
   onMapPress?: (coords: { latitude: number; longitude: number }) => void;
+  onMapLongPress?: (coords: { latitude: number; longitude: number }) => void;
+  centerCoords?: { latitude: number; longitude: number };
   initialCenter?: SafeCoords;
   initialZoom?: number;
   style?: any;
@@ -120,6 +124,7 @@ export interface SafeMapViewProps {
   children?: ReactNode;
   attributionStyle?: any;
   onRetry?: () => void;
+  onTouchMap?: () => void;
 }
 
 /**
@@ -258,6 +263,8 @@ export const SafeMapView = forwardRef<SafeMapViewRef, SafeMapViewProps>(
       selectedPlace,
       onSelectPlace,
       onMapPress,
+      onMapLongPress,
+      centerCoords,
       initialCenter = DEFAULT_MAP_CENTER,
       initialZoom = 13,
       style,
@@ -266,27 +273,95 @@ export const SafeMapView = forwardRef<SafeMapViewRef, SafeMapViewProps>(
       children,
       attributionStyle,
       onRetry,
+      onTouchMap,
     },
     ref
   ) => {
     const cameraRef = useRef<CameraRef>(null);
+    const isMapReadyRef = useRef<boolean>(false);
+    const isMountedRef = useRef<boolean>(true);
+    const pendingCameraActionRef = useRef<(() => void) | null>(null);
+
+    useEffect(() => {
+      isMountedRef.current = true;
+      // Fallback timer: sau 400ms nếu onDidFinishLoadingMap chưa gọi, vẫn cho phép camera actions
+      const timer = setTimeout(() => {
+        if (isMountedRef.current) {
+          isMapReadyRef.current = true;
+          if (pendingCameraActionRef.current) {
+            const pending = pendingCameraActionRef.current;
+            pendingCameraActionRef.current = null;
+            pending();
+          }
+        }
+      }, 400);
+
+      return () => {
+        isMountedRef.current = false;
+        isMapReadyRef.current = false;
+        pendingCameraActionRef.current = null;
+        clearTimeout(timer);
+      };
+    }, []);
+
+    const safeCameraAction = useCallback((action: () => Promise<void> | void) => {
+      if (!isMountedRef.current) return;
+
+      if (!isMapReadyRef.current) {
+        pendingCameraActionRef.current = action;
+        return;
+      }
+
+      try {
+        const res = action();
+        if (res && typeof (res as any).catch === 'function') {
+          (res as any).catch((err: any) => {
+            // Nuốt lỗi nếu view vừa unmount hoặc reactTag chưa sẵn sàng trên native thread
+            console.log('[SafeMapView] Camera action ignored:', err?.message || err);
+          });
+        }
+      } catch (err: any) {
+        console.log('[SafeMapView] Camera action sync error:', err?.message || err);
+      }
+    }, []);
 
     useImperativeHandle(ref, () => ({
       flyTo: (coords: { latitude: number; longitude: number }, zoom = 14) => {
-        cameraRef.current?.flyTo({
-          center: [coords.longitude, coords.latitude],
-          zoom,
-          duration: 600,
-        });
+        safeCameraAction(() =>
+          cameraRef.current?.flyTo({
+            center: [coords.longitude, coords.latitude],
+            zoom,
+            duration: 600,
+          }) as any
+        );
       },
       easeTo: (coords: { latitude: number; longitude: number }, zoom = 14) => {
-        cameraRef.current?.easeTo({
-          center: [coords.longitude, coords.latitude],
-          zoom,
-          duration: 400,
-        });
+        safeCameraAction(() =>
+          cameraRef.current?.easeTo({
+            center: [coords.longitude, coords.latitude],
+            zoom,
+            duration: 400,
+          }) as any
+        );
       },
     }));
+
+    const prevCenterRef = useRef<string>('');
+    useEffect(() => {
+      if (centerCoords && centerCoords.latitude && centerCoords.longitude) {
+        const key = `${centerCoords.latitude.toFixed(5)},${centerCoords.longitude.toFixed(5)}`;
+        if (key !== prevCenterRef.current) {
+          prevCenterRef.current = key;
+          safeCameraAction(() =>
+            cameraRef.current?.flyTo({
+              center: [centerCoords.longitude, centerCoords.latitude],
+              zoom: initialZoom,
+              duration: 600,
+            }) as any
+          );
+        }
+      }
+    }, [centerCoords?.latitude, centerCoords?.longitude, initialZoom, safeCameraAction]);
 
     const isAvailable = isNativeMapAvailable();
 
@@ -329,6 +404,25 @@ export const SafeMapView = forwardRef<SafeMapViewRef, SafeMapViewProps>(
       }
     };
 
+    const handleMapLongPressEvent = (e: any) => {
+      const coords = e?.nativeEvent?.lngLat || e?.lngLat;
+      if (onMapLongPress && coords && Array.isArray(coords) && coords.length >= 2) {
+        const [lng, lat] = coords;
+        // Phân biệt với marker interaction: không kích hoạt nếu tọa độ trùng gần với marker hiện có
+        const isNearExistingMarker = places.some((p) => {
+          const latDiff = Math.abs(p.latitude - lat);
+          const lngDiff = Math.abs(p.longitude - lng);
+          return latDiff < 0.0005 && lngDiff < 0.0005;
+        });
+        if (!isNearExistingMarker) {
+          onMapLongPress({
+            longitude: lng,
+            latitude: lat,
+          });
+        }
+      }
+    };
+
     return (
       <MapErrorBoundary
         fallback={() => (
@@ -348,6 +442,7 @@ export const SafeMapView = forwardRef<SafeMapViewRef, SafeMapViewProps>(
             isFullScreen ? styles.mapContainerFullScreen : { height },
             style,
           ]}
+          onTouchStart={onTouchMap}
         >
           <MLMap
             style={StyleSheet.absoluteFill}
@@ -358,6 +453,19 @@ export const SafeMapView = forwardRef<SafeMapViewRef, SafeMapViewProps>(
             dragPan={true}
             touchZoom={true}
             onPress={handleMapPressEvent}
+            onLongPress={handleMapLongPressEvent}
+            onDidFinishLoadingMap={() => {
+              isMapReadyRef.current = true;
+              if (pendingCameraActionRef.current) {
+                const pending = pendingCameraActionRef.current;
+                pendingCameraActionRef.current = null;
+                setTimeout(() => {
+                  if (isMountedRef.current) {
+                    pending();
+                  }
+                }, 50);
+              }
+            }}
           >
             <MLCamera
               ref={cameraRef}

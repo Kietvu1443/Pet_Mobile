@@ -2,7 +2,6 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   Dimensions,
   Image,
   Pressable,
@@ -23,6 +22,7 @@ import {
 } from '@/lib/api/userPets';
 import { resolveImageUrl } from '@/lib/images/resolveUrl';
 import { ConfirmDeleteModal } from '@/components/ConfirmDeleteModal';
+import { AppDialog, AppDialogProps } from '@/components/ui/AppDialog';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const IMAGE_HEIGHT = 300;
@@ -37,10 +37,9 @@ export default function UserPetDetailScreen() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeImageIdx, setActiveImageIdx] = useState(0);
-
-  // Modal xóa
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [dialogConfig, setDialogConfig] = useState<AppDialogProps | null>(null);
 
   const loadPetDetail = useCallback(async () => {
     if (!id || isNaN(Number(id))) {
@@ -76,7 +75,15 @@ export default function UserPetDetailScreen() {
       router.replace('/(tabs)/pets' as Parameters<typeof router.replace>[0]);
     } catch (err: any) {
       console.error('Delete pet error:', err);
-      Alert.alert('Lỗi', err.message || 'Không thể xóa thú cưng. Vui lòng thử lại.');
+      setDialogConfig({
+        visible: true,
+        variant: 'error',
+        title: 'Lỗi',
+        message: err?.message || 'Không thể xóa thú cưng. Vui lòng thử lại.',
+        singleButton: true,
+        confirmText: 'Đã hiểu',
+        onConfirm: () => setDialogConfig(null),
+      });
     } finally {
       setDeleting(false);
     }
@@ -289,6 +296,21 @@ export default function UserPetDetailScreen() {
         loading={deleting}
         onConfirm={handleDelete}
         onCancel={() => setShowDeleteModal(false)}
+      />
+
+      {/* Standard AppDialog */}
+      <AppDialog
+        visible={Boolean(dialogConfig?.visible)}
+        title={dialogConfig?.title || ''}
+        message={dialogConfig?.message}
+        variant={dialogConfig?.variant}
+        iconName={dialogConfig?.iconName}
+        confirmText={dialogConfig?.confirmText}
+        cancelText={dialogConfig?.cancelText}
+        singleButton={dialogConfig?.singleButton}
+        loading={dialogConfig?.loading}
+        onConfirm={dialogConfig?.onConfirm}
+        onCancel={dialogConfig?.onCancel || (() => setDialogConfig(null))}
       />
     </View>
   );

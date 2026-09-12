@@ -14,7 +14,6 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   Image,
   Pressable,
   RefreshControl,
@@ -28,6 +27,7 @@ import { Ionicons } from '@expo/vector-icons';
 
 import { useTheme } from '@/lib/theme/ThemeContext';
 import { useAuth } from '@/lib/auth/AuthContext';
+import { AppDialog, AppDialogProps } from '@/components/ui/AppDialog';
 import { apiRequest } from '@/lib/api/client';
 import { calculateProfileCompletion } from '@/lib/profile/profileCompletion';
 import { resolveImageUrl } from '@/lib/images/resolveUrl';
@@ -76,6 +76,7 @@ export default function ProfileScreen() {
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [activeReview, setActiveReview] = useState<any>(null);
+  const [dialogConfig, setDialogConfig] = useState<AppDialogProps | null>(null);
 
   // Shared callback used by both focus refresh and pull-to-refresh
   const refreshData = useCallback(async () => {
@@ -102,13 +103,13 @@ export default function ProfileScreen() {
     }, [refreshData]),
   );
 
-  // Pull-to-refresh handler with error alert
+  // Pull-to-refresh handler
   const handleRefresh = useCallback(async () => {
     setRefreshing(true);
     try {
       await refreshData();
     } catch {
-      Alert.alert("Lỗi làm mới", "Không thể làm mới dữ liệu. Vui lòng thử lại.");
+      // Refresh error handled gracefully without disruptive alert
     } finally {
       setRefreshing(false);
     }
@@ -116,20 +117,25 @@ export default function ProfileScreen() {
 
   const handleLogout = useCallback(() => {
     if (isLoggingOut) return;
-    Alert.alert('Đăng xuất', 'Bạn có chắc muốn đăng xuất?', [
-      { text: 'Huỷ', style: 'cancel' },
-      {
-        text: 'Đăng xuất', style: 'destructive',
-        onPress: async () => {
-          setIsLoggingOut(true);
-          try {
-            await logout();
-          } catch {
-            setIsLoggingOut(false);
-          }
-        },
+    setDialogConfig({
+      visible: true,
+      variant: 'destructive',
+      iconName: 'log-out-outline',
+      title: 'Đăng xuất',
+      message: 'Bạn có chắc chắn muốn đăng xuất khỏi tài khoản không?',
+      confirmText: 'Đăng xuất',
+      cancelText: 'Hủy',
+      onConfirm: async () => {
+        setDialogConfig(null);
+        setIsLoggingOut(true);
+        try {
+          await logout();
+        } catch {
+          setIsLoggingOut(false);
+        }
       },
-    ]);
+      onCancel: () => setDialogConfig(null),
+    });
   }, [isLoggingOut, logout]);
 
   const { theme } = useTheme();
@@ -335,6 +341,20 @@ export default function ProfileScreen() {
           <Text style={[styles.loadingText, { color: theme.colors.text }]}>Đang đăng xuất…</Text>
         </View>
       )}
+
+      <AppDialog
+        visible={Boolean(dialogConfig?.visible)}
+        title={dialogConfig?.title || ''}
+        message={dialogConfig?.message}
+        variant={dialogConfig?.variant}
+        iconName={dialogConfig?.iconName}
+        confirmText={dialogConfig?.confirmText}
+        cancelText={dialogConfig?.cancelText}
+        singleButton={dialogConfig?.singleButton}
+        loading={dialogConfig?.loading}
+        onConfirm={dialogConfig?.onConfirm}
+        onCancel={dialogConfig?.onCancel || (() => setDialogConfig(null))}
+      />
     </View>
   );
 }

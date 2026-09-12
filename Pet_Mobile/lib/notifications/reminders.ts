@@ -24,19 +24,12 @@ Notifications.setNotificationHandler({
 });
 
 /**
- * Request notification permissions from OS / Expo
+ * Check notification permissions from OS / Expo (Silent, NEVER request)
  */
-export async function requestNotificationPermission(): Promise<boolean> {
+export async function checkNotificationPermission(): Promise<boolean> {
   try {
-    const { status: existingStatus } = await Notifications.getPermissionsAsync();
-    let finalStatus = existingStatus;
-
-    if (existingStatus !== 'granted') {
-      const { status } = await Notifications.requestPermissionsAsync();
-      finalStatus = status;
-    }
-
-    if (finalStatus !== 'granted') {
+    const { status } = await Notifications.getPermissionsAsync();
+    if (status !== 'granted') {
       return false;
     }
 
@@ -51,10 +44,13 @@ export async function requestNotificationPermission(): Promise<boolean> {
 
     return true;
   } catch (error) {
-    console.error('Failed to request notification permission:', error);
+    console.error('Failed to check notification permission:', error);
     return false;
   }
 }
+
+// Backward compatibility alias: silent only, never prompts
+export const requestNotificationPermission = checkNotificationPermission;
 
 /**
  * Get all saved reminders from AsyncStorage
@@ -100,9 +96,9 @@ export async function schedulePetReminder(
   targetDate: Date,
   isSuperliked: boolean = false
 ): Promise<PetReminder | null> {
-  const hasPermission = await requestNotificationPermission();
+  const hasPermission = await checkNotificationPermission();
   if (!hasPermission) {
-    throw new Error('Chưa cấp quyền thông báo cho ứng dụng');
+    throw new Error('Vui lòng bật thông báo trong Cài đặt để nhận lời nhắc này.');
   }
 
   // 1. Cancel existing reminder for this pet if any

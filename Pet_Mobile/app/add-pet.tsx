@@ -12,7 +12,6 @@ import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   Image,
   KeyboardAvoidingView,
   Platform,
@@ -30,6 +29,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { useTheme } from '@/lib/theme/ThemeContext';
 import { createUserPet, formatAgeFromBirthDate } from '@/lib/api/userPets';
 import { AddPetSuccessModal } from '@/components/AddPetSuccessModal';
+import { AppDialog, AppDialogProps } from '@/components/ui/AppDialog';
 
 const TRAITS_SUGGESTIONS = [
   'Hiền lành', 'Năng động', 'Yêu trẻ con', 'Trầm tính',
@@ -86,12 +86,14 @@ function Step1({
   species, setSpecies,
   gender, setGender,
   name, setName,
+  nameError, setNameError,
   breed, setBreed,
   images, pickImages, removeImage,
 }: {
   species: Species; setSpecies: (s: Species) => void;
   gender: Gender; setGender: (g: Gender) => void;
   name: string; setName: (v: string) => void;
+  nameError?: string | null; setNameError?: (v: string | null) => void;
   breed: string; setBreed: (v: string) => void;
   images: SelectedImage[];
   pickImages: () => void;
@@ -168,7 +170,19 @@ function Step1({
       {/* Name */}
       <View style={{ marginBottom: 20 }}>
         <FormLabel>Tên bé *</FormLabel>
-        <FormInput value={name} onChangeText={setName} placeholder="Tên thú cưng của bạn..." />
+        <FormInput
+          value={name}
+          onChangeText={(v) => {
+            setName(v);
+            if (nameError && setNameError) setNameError(null);
+          }}
+          placeholder="Tên thú cưng của bạn..."
+        />
+        {nameError ? (
+          <Text style={{ color: '#EF4444', fontSize: 13, marginTop: 6, fontWeight: '600' }}>
+            ⚠ {nameError}
+          </Text>
+        ) : null}
       </View>
 
       {/* Breed */}
@@ -383,7 +397,7 @@ function Step3({
         <View style={{ flex: 1 }}>
           <Text style={styles.previewNoteTitle}>Sắp hoàn tất!</Text>
           <Text style={styles.previewNoteDesc}>
-            Bé sẽ được thêm vào danh sách "Thú cưng của tôi" để bạn dễ dàng quản lý và chăm sóc.
+            {'Bé sẽ được thêm vào danh sách "Thú cưng của tôi" để bạn dễ dàng quản lý và chăm sóc.'}
           </Text>
         </View>
       </View>
@@ -412,6 +426,8 @@ export default function AddPetScreen() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [createdPetName, setCreatedPetName] = useState('');
+  const [nameError, setNameError] = useState<string | null>(null);
+  const [dialogConfig, setDialogConfig] = useState<AppDialogProps | null>(null);
 
   // Tính birth_date ISO string (YYYY-MM-DD) từ số năm/tháng
   const calculateBirthDate = (): string | null => {
@@ -425,19 +441,8 @@ export default function AddPetScreen() {
     return d.toISOString().split('T')[0];
   };
 
-  const pickImages = async () => {
-    if (images.length >= 5) {
-      Alert.alert('Giới hạn', 'Bạn chỉ có thể chọn tối đa 5 ảnh.');
-      return;
-    }
-
+  const launchImagePicker = async () => {
     try {
-      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (!permission.granted) {
-        Alert.alert('Quyền truy cập', 'Vui lòng cấp quyền truy cập thư viện ảnh để thêm ảnh bé.');
-        return;
-      }
-
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ['images'],
         allowsMultipleSelection: true,
@@ -458,8 +463,34 @@ export default function AddPetScreen() {
       }
     } catch (error) {
       console.error('Error picking image:', error);
-      Alert.alert('Lỗi', 'Không thể mở thư viện ảnh.');
+      setDialogConfig({
+        visible: true,
+        variant: 'error',
+        title: 'Lỗi',
+        message: 'Không thể mở thư viện ảnh. Vui lòng thử lại.',
+        singleButton: true,
+        confirmText: 'Đã hiểu',
+        onConfirm: () => setDialogConfig(null),
+      });
     }
+  };
+
+  const pickImages = async () => {
+    if (images.length >= 5) {
+      setDialogConfig({
+        visible: true,
+        variant: 'info',
+        iconName: 'images-outline',
+        title: 'Giới hạn ảnh',
+        message: 'Bạn chỉ có thể chọn tối đa 5 ảnh cho bé thú cưng.',
+        singleButton: true,
+        confirmText: 'Đã hiểu',
+        onConfirm: () => setDialogConfig(null),
+      });
+      return;
+    }
+
+    launchImagePicker();
   };
 
   const removeImage = (index: number) => {
@@ -481,7 +512,7 @@ export default function AddPetScreen() {
 
   const handleSubmit = async () => {
     if (!name.trim()) {
-      Alert.alert('Thông báo', 'Vui lòng nhập tên cho bé thú cưng.');
+      setNameError('Vui lòng nhập tên cho bé thú cưng');
       setStep(1);
       return;
     }
@@ -517,7 +548,15 @@ export default function AddPetScreen() {
       setShowSuccessModal(true);
     } catch (error: any) {
       console.error('Create user pet error:', error);
-      Alert.alert('Lỗi', error.message || 'Không thể tạo thú cưng. Vui lòng thử lại.');
+      setDialogConfig({
+        visible: true,
+        variant: 'error',
+        title: 'Lỗi tạo thú cưng',
+        message: error?.message || 'Không thể tạo thú cưng. Vui lòng thử lại.',
+        singleButton: true,
+        confirmText: 'Đã hiểu',
+        onConfirm: () => setDialogConfig(null),
+      });
     } finally {
       setIsSubmitting(false);
     }
@@ -526,9 +565,10 @@ export default function AddPetScreen() {
   const handleNext = () => {
     if (step === 1) {
       if (!name.trim()) {
-        Alert.alert('Thông báo', 'Vui lòng nhập tên cho bé trước khi tiếp tục.');
+        setNameError('Vui lòng nhập tên cho bé trước khi tiếp tục');
         return;
       }
+      setNameError(null);
       setStep(2);
     } else if (step === 2) {
       setStep(3);
@@ -588,6 +628,7 @@ export default function AddPetScreen() {
               species={species} setSpecies={setSpecies}
               gender={gender} setGender={setGender}
               name={name} setName={setName}
+              nameError={nameError} setNameError={setNameError}
               breed={breed} setBreed={setBreed}
               images={images} pickImages={pickImages} removeImage={removeImage}
             />
@@ -653,6 +694,21 @@ export default function AddPetScreen() {
             setShowSuccessModal(false);
             router.replace('/(tabs)/pets' as Parameters<typeof router.replace>[0]);
           }}
+        />
+
+        {/* Standard AppDialog */}
+        <AppDialog
+          visible={Boolean(dialogConfig?.visible)}
+          title={dialogConfig?.title || ''}
+          message={dialogConfig?.message}
+          variant={dialogConfig?.variant}
+          iconName={dialogConfig?.iconName}
+          confirmText={dialogConfig?.confirmText}
+          cancelText={dialogConfig?.cancelText}
+          singleButton={dialogConfig?.singleButton}
+          loading={dialogConfig?.loading}
+          onConfirm={dialogConfig?.onConfirm}
+          onCancel={dialogConfig?.onCancel || (() => setDialogConfig(null))}
         />
       </View>
     </KeyboardAvoidingView>

@@ -54,6 +54,18 @@ export const NOTIFICATION_META: Record<string, NotificationMeta> = {
     color: '#FFB340',
     bg: '#FFF8E8',
   },
+  PLACE_APPROVED: {
+    priority: 'success',
+    icon: 'location-outline',
+    color: '#34C759',
+    bg: '#E8F8EE',
+  },
+  PLACE_REJECTED: {
+    priority: 'warning',
+    icon: 'location-outline',
+    color: '#FF4D4F',
+    bg: '#FFF0F0',
+  },
   __default__: {
     priority: 'info',
     icon: 'notifications-outline',

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -38,6 +38,14 @@ export function PlaceReviewModal({
   const [comment, setComment] = useState<string>(initialComment || '');
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (visible) {
+      setRating(initialRating);
+      setComment(initialComment || '');
+      setError(null);
+    }
+  }, [visible, initialRating, initialComment]);
 
   const handleSubmit = async () => {
     if (rating < 1 || rating > 5) {

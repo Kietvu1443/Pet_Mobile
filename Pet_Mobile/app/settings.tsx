@@ -1,7 +1,7 @@
-import { useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useRouter, useFocusEffect } from 'expo-router';
+import { useCallback, useEffect, useState } from 'react';
 import {
-  Alert,
+  AppState,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -21,6 +21,16 @@ import { notifyThemeChange } from '@/hooks/use-color-scheme';
 import { useOTAStore } from '@/lib/updates/otaStore';
 import { updateService } from '@/lib/updates/updateService';
 import { UpdateModal } from '@/components/UpdateModal';
+import { AppDialog, AppDialogProps } from '@/components/ui/AppDialog';
+import {
+  getNotificationPermissionDetails,
+  requestNotificationPermission,
+  openAppSettings,
+} from '@/lib/permissions/permissionService';
+import {
+  registerDevicePushToken,
+  unregisterDevicePushToken,
+} from '@/lib/notifications/device';
 
 const LANGUAGES: { id: Language; label: Record<string, string> }[] = [
   { id: 'vi', label: { vi: 'Tiếng Việt', en: 'Vietnamese' } },
@@ -59,14 +69,48 @@ export default function SettingsScreen() {
 
   const [language, setLanguageState] = useState<Language>('vi');
 
-  const [pushEnabled, setPushEnabled] = useState(user?.preferences?.pushEnabled !== false);
+  // 1. App-level preferences
+  const [appPushPreference, setAppPushPreference] = useState(user?.preferences?.pushEnabled !== false);
   const [emailEnabled, setEmailEnabled] = useState(user?.preferences?.emailEnabled !== false);
 
-  // Sync toggles when AuthContext.user changes (e.g. after login)
+  // 2. OS-level permission state (chạy silent)
+  const [osPermissionGranted, setOsPermissionGranted] = useState(false);
+
+  // Effective push state: Cả app preference VÀ OS permission đều phải là true
+  const effectivePushEnabled = appPushPreference && osPermissionGranted;
+
+  // Sync toggles when AuthContext.user changes
   useEffect(() => {
-    setPushEnabled(user?.preferences?.pushEnabled !== false);
+    setAppPushPreference(user?.preferences?.pushEnabled !== false);
     setEmailEnabled(user?.preferences?.emailEnabled !== false);
   }, [user?.preferences?.pushEnabled, user?.preferences?.emailEnabled]);
+
+  // Đọc OS notification permission im lặng mỗi khi Settings screen focus hoặc khi user từ Cài đặt máy quay lại
+  // Tuyệt đối không tự động request permission
+  useFocusEffect(
+    useCallback(() => {
+      let active = true;
+      const updatePerm = async () => {
+        const details = await getNotificationPermissionDetails();
+        if (active) {
+          setOsPermissionGranted(details.granted);
+        }
+      };
+
+      void updatePerm();
+
+      const sub = AppState.addEventListener('change', (state) => {
+        if (state === 'active') {
+          void updatePerm();
+        }
+      });
+
+      return () => {
+        active = false;
+        sub.remove();
+      };
+    }, [])
+  );
 
   const handleLanguageChange = async (lang: Language) => {
     setLanguageState(lang);
@@ -83,25 +127,142 @@ export default function SettingsScreen() {
     await setThemeAccent(colorKey);
   };
 
-  const handleToggleNotification = async (key: 'pushEnabled' | 'emailEnabled', value: boolean) => {
-    const prev = key === 'pushEnabled' ? pushEnabled : emailEnabled;
-    if (key === 'pushEnabled') setPushEnabled(value);
-    else setEmailEnabled(value);
+  const { hasUpdate, isDownloaded, isChecking } = useOTAStore();
+  const [showUpdateModal, setShowUpdateModal] = useState(false);
+  const [dialogConfig, setDialogConfig] = useState<AppDialogProps | null>(null);
+
+  // Xử lý bật/tắt Push Notification theo đúng quy chuẩn phân tách 2 trạng thái
+  const handleTogglePushNotification = async (targetValue: boolean) => {
+    // 1. Khi người dùng TẮT toggle:
+    if (!targetValue) {
+      setAppPushPreference(false);
+      try {
+        await unregisterDevicePushToken();
+        await apiRequest('/auth/preferences', {
+          method: 'PATCH',
+          body: { preferences: { pushEnabled: false } },
+        });
+        await refreshUser();
+      } catch {
+        setAppPushPreference(true);
+        setDialogConfig({
+          visible: true,
+          variant: 'error',
+          title: 'Lỗi',
+          message: 'Không thể cập nhật cài đặt thông báo. Vui lòng thử lại sau.',
+          singleButton: true,
+          confirmText: 'Đã hiểu',
+          onConfirm: () => setDialogConfig(null),
+        });
+      }
+      return;
+    }
+
+    // 2. Khi người dùng BẬT toggle:
+    const details = await getNotificationPermissionDetails();
+
+    // Trường hợp A: OS permission ĐÃ ĐƯỢC CẤP sẵn
+    if (details.granted) {
+      setOsPermissionGranted(true);
+      setAppPushPreference(true);
+      try {
+        await registerDevicePushToken(true);
+        await apiRequest('/auth/preferences', {
+          method: 'PATCH',
+          body: { preferences: { pushEnabled: true } },
+        });
+        await refreshUser();
+      } catch {
+        setAppPushPreference(false);
+        setDialogConfig({
+          visible: true,
+          variant: 'error',
+          title: 'Lỗi',
+          message: 'Không thể bật thông báo. Vui lòng thử lại sau.',
+          singleButton: true,
+          confirmText: 'Đã hiểu',
+          onConfirm: () => setDialogConfig(null),
+        });
+      }
+      return;
+    }
+
+    // Trường hợp B: OS permission CHƯA CẤP và không thể hỏi lại (canAskAgain = false)
+    if (!details.canAskAgain) {
+      setDialogConfig({
+        visible: true,
+        variant: 'warning',
+        iconName: 'settings-outline',
+        title: 'Cần cấp quyền trong Cài đặt',
+        message: 'Quyền thông báo đã bị tắt trên thiết bị. Vui lòng mở Cài đặt thiết bị để cho phép Pet Helper gửi thông báo.',
+        confirmText: 'Mở Cài đặt',
+        cancelText: 'Đóng',
+        onConfirm: () => {
+          setDialogConfig(null);
+          openAppSettings();
+        },
+        onCancel: () => setDialogConfig(null),
+      });
+      return;
+    }
+
+    // Trường hợp C: OS permission CHƯA CẤP nhưng có thể hỏi -> Hiện AppDialog giải thích trước
+    setDialogConfig({
+      visible: true,
+      variant: 'permission',
+      iconName: 'notifications-outline',
+      title: 'Bật thông báo',
+      message: 'Cho phép Pet Helper gửi thông báo để bạn không bỏ lỡ nhắc nhở chăm sóc thú cưng, lịch hẹn và tin nhắn mới.',
+      confirmText: 'Cho phép',
+      cancelText: 'Để sau',
+      onCancel: () => setDialogConfig(null),
+      onConfirm: async () => {
+        setDialogConfig(null);
+        // Gọi native permission sau khi người dùng bấm "Cho phép" trên AppDialog
+        const req = await requestNotificationPermission();
+        if (req.granted) {
+          setOsPermissionGranted(true);
+          setAppPushPreference(true);
+          try {
+            await registerDevicePushToken(true);
+            await apiRequest('/auth/preferences', {
+              method: 'PATCH',
+              body: { preferences: { pushEnabled: true } },
+            });
+            await refreshUser();
+          } catch {
+            setAppPushPreference(false);
+          }
+        } else {
+          // Người dùng từ chối native prompt -> toggle giữ nguyên OFF
+          setOsPermissionGranted(false);
+        }
+      },
+    });
+  };
+
+  const handleToggleEmailNotification = async (value: boolean) => {
+    const prev = emailEnabled;
+    setEmailEnabled(value);
     try {
       await apiRequest('/auth/preferences', {
         method: 'PATCH',
-        body: { preferences: { [key]: value } },
+        body: { preferences: { emailEnabled: value } },
       });
       await refreshUser();
     } catch {
-      if (key === 'pushEnabled') setPushEnabled(prev);
-      else setEmailEnabled(prev);
-      Alert.alert('Lỗi', 'Không thể cập nhật cài đặt thông báo');
+      setEmailEnabled(prev);
+      setDialogConfig({
+        visible: true,
+        variant: 'error',
+        title: 'Lỗi',
+        message: 'Không thể cập nhật cài đặt email. Vui lòng thử lại sau.',
+        singleButton: true,
+        confirmText: 'Đã hiểu',
+        onConfirm: () => setDialogConfig(null),
+      });
     }
   };
-
-  const { hasUpdate, isDownloaded, isChecking } = useOTAStore();
-  const [showUpdateModal, setShowUpdateModal] = useState(false);
 
   return (
     <Animated.View style={[styles.screen, { backgroundColor: theme.colors.background, paddingTop: insets.top }]}>
@@ -194,18 +355,18 @@ export default function SettingsScreen() {
         <View style={[styles.toggleGroup, { backgroundColor: theme.colors.card }]}>
           <Pressable
             style={({ pressed }) => [styles.toggleRow, pressed && { opacity: 0.7 }]}
-            onPress={() => handleToggleNotification('pushEnabled', !pushEnabled)}
+            onPress={() => handleTogglePushNotification(!effectivePushEnabled)}
           >
             <Ionicons name="notifications-outline" size={20} color={theme.colors.text} />
             <Text style={[styles.toggleLabel, { color: theme.colors.text }]}>{t('settings:push')}</Text>
-            <View style={[styles.toggleSwitch, pushEnabled && styles.toggleSwitchOn]}>
-              <View style={[styles.toggleThumb, pushEnabled && styles.toggleThumbOn]} />
+            <View style={[styles.toggleSwitch, effectivePushEnabled && styles.toggleSwitchOn]}>
+              <View style={[styles.toggleThumb, effectivePushEnabled && styles.toggleThumbOn]} />
             </View>
           </Pressable>
           <View style={[styles.toggleDivider, { backgroundColor: theme.colors.border }]} />
           <Pressable
             style={({ pressed }) => [styles.toggleRow, pressed && { opacity: 0.7 }]}
-            onPress={() => handleToggleNotification('emailEnabled', !emailEnabled)}
+            onPress={() => handleToggleEmailNotification(!emailEnabled)}
           >
             <Ionicons name="mail-outline" size={20} color={theme.colors.text} />
             <Text style={[styles.toggleLabel, { color: theme.colors.text }]}>{t('settings:email')}</Text>
@@ -219,6 +380,21 @@ export default function SettingsScreen() {
       <UpdateModal
         visible={showUpdateModal}
         onClose={() => setShowUpdateModal(false)}
+      />
+
+      {/* Standard AppDialog */}
+      <AppDialog
+        visible={Boolean(dialogConfig?.visible)}
+        title={dialogConfig?.title || ''}
+        message={dialogConfig?.message}
+        variant={dialogConfig?.variant}
+        iconName={dialogConfig?.iconName}
+        confirmText={dialogConfig?.confirmText}
+        cancelText={dialogConfig?.cancelText}
+        singleButton={dialogConfig?.singleButton}
+        loading={dialogConfig?.loading}
+        onConfirm={dialogConfig?.onConfirm}
+        onCancel={dialogConfig?.onCancel || (() => setDialogConfig(null))}
       />
     </Animated.View>
   );

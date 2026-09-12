@@ -6,7 +6,6 @@ import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   Image,
   Pressable,
   RefreshControl,
@@ -22,6 +21,7 @@ import { apiRequest } from '@/lib/api/client';
 import { resolveImageUrl } from '@/lib/images/resolveUrl';
 import { useTheme } from '@/lib/theme/ThemeContext';
 import { useTranslation } from 'react-i18next';
+import { AppDialog, AppDialogProps } from '@/components/ui/AppDialog';
 
 type RawReport = {
   id: number;
@@ -113,13 +113,15 @@ export default function LostPetsScreen() {
     return () => { alive = false; };
   }, [loadReports]);
 
+  const [dialogConfig, setDialogConfig] = useState<AppDialogProps | null>(null);
+
   const handleRefresh = useCallback(async () => {
     setRefreshing(true);
     try {
       await loadReports();
       setError(null);
-    } catch (e) {
-      Alert.alert('Lỗi làm mới', e instanceof Error ? e.message : 'Không thể tải dữ liệu');
+    } catch {
+      // Pull-to-refresh handled gracefully
     } finally {
       setRefreshing(false);
     }
@@ -275,11 +277,37 @@ export default function LostPetsScreen() {
       {/* Report button */}
       <Pressable
         style={({ pressed }) => [styles.reportBtn, { backgroundColor: theme.colors.warning, shadowColor: theme.colors.warning }, pressed && { opacity: 0.85 }]}
-        onPress={() => Alert.alert('Đang phát triển', 'Tính năng báo cáo thất lạc đang được phát triển')}
+        onPress={() =>
+          setDialogConfig({
+            visible: true,
+            variant: 'info',
+            iconName: 'construct-outline',
+            title: 'Tính năng đang phát triển',
+            message: 'Tính năng báo cáo thú cưng thất lạc đang được hoàn thiện và sẽ sớm ra mắt.',
+            singleButton: true,
+            confirmText: 'Đã hiểu',
+            onConfirm: () => setDialogConfig(null),
+          })
+        }
       >
         <Ionicons name="warning" size={20} color="white" />
         <Text style={styles.reportBtnText}>{t('lostPets:reportBtn')}</Text>
       </Pressable>
+
+      {/* Standard AppDialog */}
+      <AppDialog
+        visible={Boolean(dialogConfig?.visible)}
+        title={dialogConfig?.title || ''}
+        message={dialogConfig?.message}
+        variant={dialogConfig?.variant}
+        iconName={dialogConfig?.iconName}
+        confirmText={dialogConfig?.confirmText}
+        cancelText={dialogConfig?.cancelText}
+        singleButton={dialogConfig?.singleButton}
+        loading={dialogConfig?.loading}
+        onConfirm={dialogConfig?.onConfirm}
+        onCancel={dialogConfig?.onCancel || (() => setDialogConfig(null))}
+      />
     </ScrollView>
   );
 }

@@ -1,6 +1,7 @@
 // API Client & Helper cho Địa điểm cộng đồng (Community Places / Khám phá gần bạn)
 import { Linking, Platform } from 'react-native';
 import { apiRequest } from './client';
+import { queryClient } from '../query/queryClient';
 
 export type PlaceType =
   | 'shelter'
@@ -148,7 +149,7 @@ export async function submitPlaceReview(
     `/places/${placeId}/reviews`,
     {
       method: 'POST',
-      body: JSON.stringify(payload),
+      body: payload,
     }
   );
 }
@@ -175,7 +176,7 @@ export async function reportPlace(
 ): Promise<{ report: any }> {
   return apiRequest<{ report: any }>(`/places/${placeId}/report`, {
     method: 'POST',
-    body: JSON.stringify(payload),
+    body: payload,
   });
 }
 
@@ -205,4 +206,61 @@ export function openDirectionsInMaps(latitude: number, longitude: number, label?
       Linking.openURL(`geo:${latLng}?q=${latLng}(${cleanLabel})`);
     });
   }
+}
+
+// ── TanStack Query Synchronization Helpers ─────────────────────────────────────
+
+export const placeQueryKeys = {
+  all: ['places'] as const,
+  nearby: (params?: Partial<NearbyPlacesParams>) => ['places', 'nearby', params] as const,
+  detail: (id: number | string) => ['places', 'detail', String(id)] as const,
+  reviews: (id: number | string) => ['places', 'reviews', String(id)] as const,
+};
+
+/**
+ * Cập nhật trực tiếp điểm số và số lượt đánh giá của địa điểm vào TanStack Query cache
+ * Giúp các màn hình map/list phản ánh ngay tức thì mà không cần reload
+ */
+export function updatePlacesCacheAfterReview(
+  placeId: number | string,
+  rating_avg: number,
+  review_count: number,
+  newReview?: PlaceReview
+) {
+  const numericId = Number(placeId);
+
+  // 1. Cập nhật chi tiết địa điểm trong cache
+  queryClient.setQueryData(
+    placeQueryKeys.detail(placeId),
+    (old: { place: Place; my_review: PlaceReview | null } | undefined) => {
+      if (!old) return old;
+      return {
+        ...old,
+        place: {
+          ...old.place,
+          rating_avg,
+          review_count,
+        },
+        my_review: newReview !== undefined ? newReview : old.my_review,
+      };
+    }
+  );
+
+  // 2. Cập nhật tất cả các query danh sách địa điểm gần đây đang có trong cache
+  queryClient.setQueriesData<Place[]>({ queryKey: ['places', 'nearby'] }, (oldPlaces) => {
+    if (!oldPlaces || !Array.isArray(oldPlaces)) return oldPlaces;
+    return oldPlaces.map((p) =>
+      p.id === numericId ? { ...p, rating_avg, review_count } : p
+    );
+  });
+
+  // 3. Đánh dấu invalidate để background refetch đồng bộ chính xác với backend
+  queryClient.invalidateQueries({ queryKey: ['places'] });
+}
+
+/**
+ * Invalidate toàn bộ cache places khi có địa điểm mới hoặc địa điểm bị xóa
+ */
+export function invalidatePlacesQueries() {
+  queryClient.invalidateQueries({ queryKey: ['places'] });
 }

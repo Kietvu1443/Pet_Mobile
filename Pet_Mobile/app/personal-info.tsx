@@ -13,7 +13,6 @@ import { useRouter } from "expo-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   Image,
   KeyboardAvoidingView,
   Modal,
@@ -31,6 +30,7 @@ import { Ionicons } from "@expo/vector-icons";
 
 import { useAuth } from "@/lib/auth/AuthContext";
 import { useTheme } from "@/lib/theme/ThemeContext";
+import { AppDialog, AppDialogProps } from "@/components/ui/AppDialog";
 import { apiRequest } from "@/lib/api/client";
 import { calculateProfileCompletion } from "@/lib/profile/profileCompletion";
 import { resolveImageUrl } from "@/lib/images/resolveUrl";
@@ -114,6 +114,8 @@ export default function PersonalInfoScreen() {
 
   // Phone validation state
   const [phoneTouched, setPhoneTouched] = useState(false);
+  const [emailError, setEmailError] = useState<string | null>(null);
+  const [dialogConfig, setDialogConfig] = useState<AppDialogProps | null>(null);
 
   const isVerifiedEmail = useMemo(() => {
     const currentEmail = (user?.email || "").trim().toLowerCase();
@@ -137,8 +139,7 @@ export default function PersonalInfoScreen() {
     return () => clearInterval(timer);
   }, [cooldownSeconds]);
 
-  const handlePickAvatar = useCallback(async () => {
-    if (uploading) return;
+  const executeAvatarPickAndUpload = useCallback(async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ["images"],
       allowsEditing: true,
@@ -162,35 +163,51 @@ export default function PersonalInfoScreen() {
       });
       await refreshUser();
       setLocalAvatarUri(null);
-      Alert.alert("Thành công", "Ảnh đại diện đã được cập nhật");
+      setDialogConfig({
+        visible: true,
+        variant: "success",
+        title: "Thành công",
+        message: "Ảnh đại diện đã được cập nhật.",
+        singleButton: true,
+        confirmText: "Đã hiểu",
+        onConfirm: () => setDialogConfig(null),
+      });
     } catch (e) {
       setLocalAvatarUri(null);
-      Alert.alert(
-        "Lỗi",
-        e instanceof Error ? e.message : "Không thể tải ảnh lên",
-      );
+      setDialogConfig({
+        visible: true,
+        variant: "error",
+        title: "Lỗi tải ảnh",
+        message: e instanceof Error ? e.message : "Không thể tải ảnh lên",
+        singleButton: true,
+        confirmText: "Đã hiểu",
+        onConfirm: () => setDialogConfig(null),
+      });
     } finally {
       setUploading(false);
     }
-  }, [uploading, refreshUser]);
+  }, [refreshUser]);
+
+  const handlePickAvatar = useCallback(() => {
+    if (uploading) return;
+    executeAvatarPickAndUpload();
+  }, [uploading, executeAvatarPickAndUpload]);
 
   const handleSendOtp = useCallback(async () => {
     if (sendingOtp || cooldownSeconds > 0) return;
 
     const trimmedEmail = emailInput.trim().toLowerCase();
     if (!trimmedEmail) {
-      Alert.alert(
-        "Thông báo",
-        "Vui lòng nhập địa chỉ email trước khi xác minh",
-      );
+      setEmailError("Vui lòng nhập địa chỉ email trước khi xác minh");
       return;
     }
 
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
-      Alert.alert("Thông báo", "Địa chỉ email không đúng định dạng");
+      setEmailError("Địa chỉ email không đúng định dạng");
       return;
     }
 
+    setEmailError(null);
     setSendingOtp(true);
     setOtpError("");
     try {
@@ -204,15 +221,26 @@ export default function PersonalInfoScreen() {
 
       setCooldownSeconds(res.data?.waitSeconds || 60);
       setShowOtpModal(true);
-      Alert.alert(
-        "Thành công",
-        res.message || "Mã OTP đã được gửi tới email của bạn.",
-      );
+      setDialogConfig({
+        visible: true,
+        variant: "success",
+        iconName: "mail-outline",
+        title: "Đã gửi mã OTP",
+        message: res.message || "Mã OTP đã được gửi tới email của bạn. Vui lòng kiểm tra hộp thư.",
+        singleButton: true,
+        confirmText: "Đã hiểu",
+        onConfirm: () => setDialogConfig(null),
+      });
     } catch (e) {
-      Alert.alert(
-        "Lỗi",
-        e instanceof Error ? e.message : "Không thể gửi mã OTP",
-      );
+      setDialogConfig({
+        visible: true,
+        variant: "error",
+        title: "Lỗi gửi mã OTP",
+        message: e instanceof Error ? e.message : "Không thể gửi mã OTP",
+        singleButton: true,
+        confirmText: "Đã hiểu",
+        onConfirm: () => setDialogConfig(null),
+      });
     } finally {
       setSendingOtp(false);
     }
@@ -236,7 +264,16 @@ export default function PersonalInfoScreen() {
       await refreshUser();
       setShowOtpModal(false);
       setOtpCode("");
-      Alert.alert("Thành công", "Email của bạn đã được xác thực thành công!");
+      setDialogConfig({
+        visible: true,
+        variant: "success",
+        iconName: "checkmark-circle-outline",
+        title: "Thành công",
+        message: "Email của bạn đã được xác thực thành công!",
+        singleButton: true,
+        confirmText: "Đã hiểu",
+        onConfirm: () => setDialogConfig(null),
+      });
     } catch (e) {
       setOtpError(e instanceof Error ? e.message : "Không thể xác nhận mã OTP");
     } finally {
@@ -265,10 +302,6 @@ export default function PersonalInfoScreen() {
 
     if (phone && !PHONE_REGEX.test(phone)) {
       setPhoneTouched(true);
-      Alert.alert(
-        "Thông báo",
-        "Số điện thoại không đúng định dạng (9 - 15 chữ số)",
-      );
       return;
     }
 
@@ -317,10 +350,15 @@ export default function PersonalInfoScreen() {
       await refreshUser();
       router.back();
     } catch (e) {
-      Alert.alert(
-        "Lỗi",
-        e instanceof Error ? e.message : "Không thể lưu thay đổi",
-      );
+      setDialogConfig({
+        visible: true,
+        variant: "error",
+        title: "Lỗi",
+        message: e instanceof Error ? e.message : "Không thể lưu thay đổi",
+        singleButton: true,
+        confirmText: "Đã hiểu",
+        onConfirm: () => setDialogConfig(null),
+      });
     } finally {
       setSaving(false);
     }
@@ -773,13 +811,26 @@ export default function PersonalInfoScreen() {
               <TextInput
                 style={[styles.fieldInput, { color: theme.colors.text }]}
                 value={emailInput}
-                onChangeText={setEmailInput}
+                onChangeText={(t) => {
+                  setEmailInput(t);
+                  if (emailError) setEmailError(null);
+                }}
                 placeholder="Nhập email của bạn..."
                 placeholderTextColor={theme.colors.muted}
                 keyboardType="email-address"
                 autoCapitalize="none"
               />
             </View>
+            {emailError ? (
+              <Text
+                style={[
+                  styles.validationWarning,
+                  { color: theme.colors.error, marginTop: 4 },
+                ]}
+              >
+                {emailError}
+              </Text>
+            ) : null}
           </View>
 
           {/* Address */}
@@ -1035,6 +1086,21 @@ export default function PersonalInfoScreen() {
           </View>
         </Modal>
       </Animated.View>
+
+      {/* Standard AppDialog */}
+      <AppDialog
+        visible={Boolean(dialogConfig?.visible)}
+        title={dialogConfig?.title || ""}
+        message={dialogConfig?.message}
+        variant={dialogConfig?.variant}
+        iconName={dialogConfig?.iconName}
+        confirmText={dialogConfig?.confirmText}
+        cancelText={dialogConfig?.cancelText}
+        singleButton={dialogConfig?.singleButton}
+        loading={dialogConfig?.loading}
+        onConfirm={dialogConfig?.onConfirm}
+        onCancel={dialogConfig?.onCancel || (() => setDialogConfig(null))}
+      />
     </KeyboardAvoidingView>
   );
 }

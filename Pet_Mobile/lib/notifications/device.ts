@@ -8,6 +8,24 @@ import { isRunningInExpoGo } from 'expo';
 import { apiRequest } from '../api/client';
 
 const PUSH_TOKEN_KEY = 'pethelper.push.token';
+const PUSH_PREFERENCE_KEY = 'pethelper.push.enabled_pref';
+
+export async function getLocalPushPreference(): Promise<boolean> {
+  try {
+    const val = await SecureStore.getItemAsync(PUSH_PREFERENCE_KEY);
+    return val !== 'false';
+  } catch {
+    return true;
+  }
+}
+
+export async function setLocalPushPreference(enabled: boolean): Promise<void> {
+  try {
+    await SecureStore.setItemAsync(PUSH_PREFERENCE_KEY, enabled ? 'true' : 'false');
+  } catch {
+    // ignore
+  }
+}
 
 const KNOWN_SCREENS: Record<string, string> = {
   HOUSING_APPROVED: '/housing-review',
@@ -18,6 +36,8 @@ const KNOWN_SCREENS: Record<string, string> = {
   ADOPTION_REJECTED: '/(tabs)/profile',
   PET_RETURN_CREATED: '/(tabs)/profile',
   PET_RETURN_UPDATED: '/(tabs)/profile',
+  PLACE_APPROVED: '/places-map',
+  PLACE_REJECTED: '/places-map',
   // Legacy types support
   return_workflow: '/(tabs)/profile',
   system: '/(tabs)/profile',
@@ -34,9 +54,13 @@ async function performRegistration(token: string): Promise<void> {
 }
 
 /**
- * Register push token with the backend
+ * Register push token with the backend.
+ * TUYỆT ĐỐI KHÔNG tự động request native permission.
+ * Chỉ đăng ký khi:
+ * 1. App-level preference (pushEnabled) là true.
+ * 2. OS Notification permission ĐÃ ĐƯỢC CẤP (granted) từ trước.
  */
-export async function registerDevicePushToken(): Promise<void> {
+export async function registerDevicePushToken(appPushEnabled?: boolean): Promise<void> {
   // 1. Expo Go Guard
   if (isRunningInExpoGo()) {
     console.warn('[Push] Remote push notifications are not supported in Expo Go sandbox. Skipping registration.');
@@ -49,8 +73,23 @@ export async function registerDevicePushToken(): Promise<void> {
     return;
   }
 
+  // 3. App-level preference check
+  if (appPushEnabled !== undefined) {
+    await setLocalPushPreference(appPushEnabled);
+    if (!appPushEnabled) {
+      console.log('[Push] App preference pushEnabled is false. Skipping registration.');
+      return;
+    }
+  } else {
+    const isLocalEnabled = await getLocalPushPreference();
+    if (!isLocalEnabled) {
+      console.log('[Push] Local push preference is disabled. Skipping registration.');
+      return;
+    }
+  }
+
   try {
-    // 3. Android-specific channel configuration
+    // 4. Android-specific channel configuration
     if (Platform.OS === 'android') {
       await Notifications.setNotificationChannelAsync('default', {
         name: 'default',
@@ -60,29 +99,24 @@ export async function registerDevicePushToken(): Promise<void> {
       });
     }
 
-    // 4. Permission flow
+    // 5. Silent permission check - TUYỆT ĐỐI KHÔNG tự động gọi requestPermissionsAsync()
     const { status: existingStatus } = await Notifications.getPermissionsAsync();
-    let finalStatus = existingStatus;
     if (existingStatus !== 'granted') {
-      const { status } = await Notifications.requestPermissionsAsync();
-      finalStatus = status;
-    }
-    if (finalStatus !== 'granted') {
-      console.warn('[Push] Notification permission denied. Skipping registration.');
+      console.log('[Push] OS Notification permission is not granted. Skipping token registration.');
       return;
     }
 
-    // 5. Retrieve project ID from Constants
+    // 6. Retrieve project ID from Constants
     const projectId = Constants.expoConfig?.extra?.eas?.projectId ?? Constants.easConfig?.projectId;
     if (!projectId) {
       console.warn('[Push] EAS Project ID not found in app config. Skipping registration.');
       return;
     }
 
-    // 6. Request token
+    // 7. Request token
     const token = (await Notifications.getExpoPushTokenAsync({ projectId })).data;
 
-    // 7. Check cache to avoid duplicate registration API calls
+    // 8. Check cache to avoid duplicate registration API calls
     const storedToken = await SecureStore.getItemAsync(PUSH_TOKEN_KEY);
     if (storedToken === token) {
       return;
@@ -91,7 +125,7 @@ export async function registerDevicePushToken(): Promise<void> {
     try {
       await performRegistration(token);
     } catch (err: any) {
-      // 8. Retry registration once if rejected (e.g. 401, 404, or stale cache)
+      // 9. Retry registration once if rejected (e.g. 401, 404, or stale cache)
       console.warn('[Push] First registration attempt failed. Clearing cache and retrying...', err.message);
       await SecureStore.deleteItemAsync(PUSH_TOKEN_KEY);
       await performRegistration(token);
@@ -104,12 +138,13 @@ export async function registerDevicePushToken(): Promise<void> {
 }
 
 /**
- * Unregister push token on logout
+ * Unregister push token on logout or when user toggles off push notifications
  */
 export async function unregisterDevicePushToken(): Promise<void> {
   if (isRunningInExpoGo()) return;
 
   try {
+    await setLocalPushPreference(false);
     const token = await SecureStore.getItemAsync(PUSH_TOKEN_KEY);
     if (token) {
       await apiRequest(`/devices/${token}`, { method: 'DELETE' });

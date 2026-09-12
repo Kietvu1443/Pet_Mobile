@@ -2,7 +2,6 @@ import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -19,6 +18,7 @@ import { useTheme } from '@/lib/theme/ThemeContext';
 import { apiRequest } from '@/lib/api/client';
 import { useAuth } from '@/lib/auth/AuthContext';
 import { useTranslation } from 'react-i18next';
+import { AppDialog, AppDialogProps } from '@/components/ui/AppDialog';
 
 type HousingType = 'apartment' | 'rental' | 'house' | null;
 type OutdoorSpace = 'none' | 'balcony' | 'garden' | null;
@@ -181,6 +181,8 @@ export default function HousingReviewScreen() {
   const [existingId, setExistingId] = useState<number | null>(null);
   const [reviewStatus, setReviewStatus] = useState<ReviewStatus>('unsubmitted');
   const [adminNotes, setAdminNotes] = useState<string | null>(null);
+  const [rejectReason, setRejectReason] = useState<string | null>(null);
+  const [dialogConfig, setDialogConfig] = useState<AppDialogProps | null>(null);
 
   const [housingType, setHousingType] = useState<HousingType>(null);
   const [outdoorSpace, setOutdoorSpace] = useState<OutdoorSpace>(null);
@@ -258,7 +260,15 @@ export default function HousingReviewScreen() {
       await refreshUser();
       router.back();
     } catch (e: any) {
-      Alert.alert('Lỗi', e.message || 'Không thể lưu đánh giá nhà ở');
+      setDialogConfig({
+        visible: true,
+        variant: 'error',
+        title: 'Lỗi',
+        message: e?.message || 'Không thể lưu đánh giá nhà ở',
+        singleButton: true,
+        confirmText: 'Đã hiểu',
+        onConfirm: () => setDialogConfig(null),
+      });
     } finally {
       setSaving(false);
     }
@@ -425,6 +435,21 @@ export default function HousingReviewScreen() {
           </Pressable>
         )}
       </View>
+
+      {/* Standard AppDialog */}
+      <AppDialog
+        visible={Boolean(dialogConfig?.visible)}
+        title={dialogConfig?.title || ''}
+        message={dialogConfig?.message}
+        variant={dialogConfig?.variant}
+        iconName={dialogConfig?.iconName}
+        confirmText={dialogConfig?.confirmText}
+        cancelText={dialogConfig?.cancelText}
+        singleButton={dialogConfig?.singleButton}
+        loading={dialogConfig?.loading}
+        onConfirm={dialogConfig?.onConfirm}
+        onCancel={dialogConfig?.onCancel || (() => setDialogConfig(null))}
+      />
     </Animated.View>
   );
 }

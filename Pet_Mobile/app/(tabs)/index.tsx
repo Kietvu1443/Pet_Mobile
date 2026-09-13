@@ -14,7 +14,7 @@
 // Tabs:
 //   "explore"   — swipe deck + action buttons
 //   "connected" — adoption requests list from backend
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Image,
@@ -66,7 +66,7 @@ type AdoptionRequest = {
 };
 
 type AdoptionRequestsResponse = {
-  requests: Array<{
+  requests: {
     id: number;
     pet_id: number;
     pet_name?: string;
@@ -76,7 +76,7 @@ type AdoptionRequestsResponse = {
     pet_gender?: string;
     status: string;
     created_at?: string;
-  }>;
+  }[];
 };
 
 function adaptRequest(r: AdoptionRequestsResponse['requests'][number]): AdoptionRequest {
@@ -478,6 +478,12 @@ export default function AdoptScreen() {
           <Text style={[styles.headerTitle, { color: theme.colors.text }]}>{t('tabs:explore')}</Text>
         </View>
         <View style={styles.headerActions}>
+          <Pressable
+            style={[styles.iconBtn, { backgroundColor: theme.colors.card }]}
+            onPress={() => router.push('/adopt-catalog' as Parameters<typeof router.push>[0])}
+          >
+            <Ionicons name="grid-outline" size={18} color={theme.colors.text} />
+          </Pressable>
           <Pressable style={[styles.iconBtn, { backgroundColor: theme.colors.card }]} onPress={() => router.push('/notifications')}>
             <Ionicons name="notifications-outline" size={18} color={theme.colors.text} />
             {unread > 0 && (

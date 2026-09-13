@@ -37,9 +37,15 @@ export type RawPet = {
   weight?: string | null; // CHUỖI ("7", "20")
   status?: string | null;
   pet_code?: string | null;
+  vaccination?: string | null;
+  contact_info?: string | null;
   description?: string | null; // có thể là ""
-  image: string; // avatar (URL tuyệt đối Cloudinary ở prod, hoặc đường dẫn tương đối ở dev)
-  images: RawPetImage[];
+  image?: string; // avatar
+  image_url?: string | null;
+  avatar_image?: string | null;
+  images?: RawPetImage[];
+  likesCount?: number;
+  isLiked?: boolean;
 };
 
 // Bao response của cả 3 endpoint PetSnap.

@@ -115,17 +115,6 @@ function FavoriteCard({
   const { theme } = useTheme();
   const { t } = useTranslation(["favorites", "common"]);
 
-  // Fetch whether this pet belongs to any collection
-  const petCollectionsQuery = useQuery({
-    queryKey: ["pet-collections", item.id],
-    queryFn: async () => {
-      const res = await fetchPetCollections(item.id);
-      return res.collectionIds || [];
-    },
-    staleTime: 5 * 60 * 1000,
-  });
-
-  const hasCollections = (petCollectionsQuery.data || []).length > 0;
 
   // Fetch personal note for this pet
   const petNoteQuery = useQuery({
@@ -1842,4 +1831,25 @@ const styles = StyleSheet.create({
     elevation: 8,
   },
   compareFabText: { color: "white", fontSize: 14, fontWeight: "800" },
+  compareBadgeText: { color: "white", fontSize: 11, fontWeight: "800" },
+  favImageOverlayGradient: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 80,
+    backgroundColor: "rgba(0,0,0,0.3)",
+  },
+  restoreBtnText: { color: "white", fontSize: 12, fontWeight: "700" },
+  toastBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 12,
+    borderWidth: 1,
+    marginBottom: 16,
+  },
+  toastText: { fontSize: 13, fontWeight: "600", flex: 1 },
 });

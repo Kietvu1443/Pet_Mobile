@@ -33,6 +33,8 @@ import { calculateProfileCompletion } from '@/lib/profile/profileCompletion';
 import { resolveImageUrl } from '@/lib/images/resolveUrl';
 import { getCurrentRoleLabel, getQuickRoleFromPreferences } from '@/lib/profile/userRole';
 import { useTranslation } from 'react-i18next';
+import { useQuery } from '@tanstack/react-query';
+import { fetchMyReports } from '@/lib/api/reports';
 
 // Adoption request count from backend
 type AdoptionRequestsResponse = { requests: { status?: string }[]; total?: number };
@@ -77,6 +79,17 @@ export default function ProfileScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [activeReview, setActiveReview] = useState<any>(null);
   const [dialogConfig, setDialogConfig] = useState<AppDialogProps | null>(null);
+
+  const myReportsQuery = useQuery({
+    queryKey: ['my-reports'],
+    queryFn: async ({ signal }) => {
+      if (!user) return null;
+      return fetchMyReports({ limit: 1 }, signal);
+    },
+    enabled: Boolean(user),
+  });
+
+  const myReportsCount = myReportsQuery.data?.summary?.total ?? 0;
 
   // Shared callback used by both focus refresh and pull-to-refresh
   const refreshData = useCallback(async () => {
@@ -163,6 +176,20 @@ export default function ProfileScreen() {
           badge: getCurrentRoleLabel(user?.role, getQuickRoleFromPreferences(user?.preferences)),
           onPress: () => router.push('/role' as Parameters<typeof router.push>[0]),
         },
+      ],
+    },
+    {
+      title: 'Dịch vụ & Tính năng',
+      items: [
+        {
+          icon: 'heart-circle-outline',
+          iconBg: '#E8F8EE',
+          iconColor: '#34C759',
+          label: 'Hồ sơ nhận nuôi',
+          sublabel: 'Tiến độ các yêu cầu nhận nuôi đã gửi',
+          badge: adoptionCount > 0 ? `${adoptionCount}` : null,
+          onPress: () => router.push('/my-adoption-requests' as Parameters<typeof router.push>[0]),
+        },
         {
           icon: 'home-outline',
           iconBg: '#E8F8EE',
@@ -180,6 +207,20 @@ export default function ProfileScreen() {
           sublabel: t('profile:lostPetsSub'),
           onPress: () => router.push('/lost-pets' as Parameters<typeof router.push>[0]),
         },
+        {
+          icon: 'megaphone-outline',
+          iconBg: '#FFF0F7',
+          iconColor: '#FF4FA3',
+          label: 'Tin báo của tôi',
+          sublabel: 'Quản lý tin báo thất lạc & nhặt được',
+          badge: myReportsCount > 0 ? `${myReportsCount}` : null,
+          onPress: () => router.push('/my-reports' as Parameters<typeof router.push>[0]),
+        },
+      ],
+    },
+    {
+      title: 'Hệ thống',
+      items: [
         {
           icon: 'settings-outline',
           iconBg: '#F0F0FF',

@@ -37,7 +37,7 @@ export function setUnauthorizedHandler(handler: (() => void) | null): void {
 }
 
 type RequestOptions = {
-  method?: 'GET' | 'POST' | 'PATCH' | 'DELETE';
+  method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
   body?: unknown;
   // Một số endpoint công khai (vd /auth/config) không cần token.
   auth?: boolean;

@@ -14,6 +14,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Image,
+  Keyboard,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -968,21 +969,43 @@ export default function PersonalInfoScreen() {
           animationType="fade"
           onRequestClose={() => setShowOtpModal(false)}
         >
-          <View
-            style={[
-              styles.modalOverlay,
-              {
-                backgroundColor: theme.colors.overlay,
-                justifyContent: "center",
-              },
-            ]}
+          <KeyboardAvoidingView
+            style={{ flex: 1 }}
+            behavior={Platform.OS === "ios" ? "padding" : "height"}
           >
-            <View
+            <Pressable
               style={[
-                styles.otpModalCard,
-                { backgroundColor: theme.colors.card },
+                StyleSheet.absoluteFillObject,
+                { backgroundColor: theme.colors.overlay },
               ]}
+              onPress={() => setShowOtpModal(false)}
+            />
+            <ScrollView
+              contentContainerStyle={{
+                flexGrow: 1,
+                justifyContent: "center",
+              }}
+              keyboardShouldPersistTaps="handled"
+              keyboardDismissMode="interactive"
+              showsVerticalScrollIndicator={false}
+              bounces={false}
             >
+              <Pressable
+                style={{
+                  flexGrow: 1,
+                  justifyContent: "center",
+                  alignItems: "center",
+                  padding: 24,
+                }}
+                onPress={Keyboard.dismiss}
+              >
+                <Pressable
+                  style={[
+                    styles.otpModalCard,
+                    { backgroundColor: theme.colors.card },
+                  ]}
+                  onPress={(e) => e.stopPropagation()}
+                >
               <View style={styles.otpModalHeader}>
                 <Ionicons
                   name="mail-unread-outline"
@@ -1082,8 +1105,10 @@ export default function PersonalInfoScreen() {
                     : "Chưa nhận được mã? Gửi lại"}
                 </Text>
               </Pressable>
-            </View>
-          </View>
+                </Pressable>
+              </Pressable>
+            </ScrollView>
+          </KeyboardAvoidingView>
         </Modal>
       </Animated.View>
 

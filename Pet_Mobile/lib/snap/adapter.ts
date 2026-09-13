@@ -87,6 +87,6 @@ export function adaptPet(raw: RawPet | null | undefined): Pet | null {
     code: emptyToNull(raw.pet_code),
     description: emptyToNull(raw.description),
     avatarUri,
-    photos: buildPhotos(raw.images, avatarUri),
+    photos: buildPhotos(raw.images || [], avatarUri),
   };
 }

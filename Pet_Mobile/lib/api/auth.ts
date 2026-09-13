@@ -92,3 +92,29 @@ export async function getMe(signal?: AbortSignal): Promise<User> {
   return data.user;
 }
 
+export type SendOtpResponse = {
+  email: string;
+  waitSeconds: number;
+};
+
+export type VerifyOtpResponse = {
+  token: string;
+  user: User;
+};
+
+// POST /api/v1/auth/send-otp — gửi mã OTP về email (yêu cầu token)
+export function sendEmailOtp(email?: string): Promise<SendOtpResponse> {
+  return apiRequest<SendOtpResponse>('/auth/send-otp', {
+    method: 'POST',
+    body: email ? { email } : {},
+  });
+}
+
+// POST /api/v1/auth/verify-otp — xác nhận mã OTP (yêu cầu token)
+export function verifyEmailOtp(otp: string): Promise<VerifyOtpResponse> {
+  return apiRequest<VerifyOtpResponse>('/auth/verify-otp', {
+    method: 'POST',
+    body: { otp },
+  });
+}
+

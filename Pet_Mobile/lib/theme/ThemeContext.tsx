@@ -23,6 +23,7 @@ export type ThemeColors = {
   selectedContainer: string;
   disabled: string;
   overlay: string;
+  notification: string;
 };
 
 export type ThemeObject = {
@@ -45,6 +46,7 @@ const LIGHT_THEME: Omit<ThemeColors, 'primary' | 'primaryContainer' | 'selectedC
   errorContainer: '#FFF0F0',
   disabled: '#E5E7EB',
   overlay: 'rgba(0, 0, 0, 0.4)',
+  notification: '#FF4FA3',
 };
 
 const DARK_THEME: Omit<ThemeColors, 'primary' | 'primaryContainer' | 'selectedContainer'> = {
@@ -62,6 +64,7 @@ const DARK_THEME: Omit<ThemeColors, 'primary' | 'primaryContainer' | 'selectedCo
   errorContainer: '#3C1618',
   disabled: '#3A3A3C',
   overlay: 'rgba(0, 0, 0, 0.7)',
+  notification: '#FF4FA3',
 };
 
 function buildTheme(accentColor: AccentColorKey, isDark: boolean): ThemeObject {

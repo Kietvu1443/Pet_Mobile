@@ -28,16 +28,22 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { useTheme } from '@/lib/theme/ThemeContext';
+import { useAuth } from '@/lib/auth/AuthContext';
 import { apiRequest } from '@/lib/api/client';
 import { adaptPet } from '@/lib/snap/adapter';
 import type { RawPet } from '@/lib/api/petSnap';
 import { resolveImageUrl } from '@/lib/images/resolveUrl';
 import { PetNoteModal } from '@/components/PetNoteModal';
 import { PetReminderModal } from '@/components/PetReminderModal';
+import { VerifyEmailModal } from '@/components/VerifyEmailModal';
+import { AdoptionRequestModal } from '@/components/AdoptionRequestModal';
+import { AppDialog, type AppDialogProps } from '@/components/ui/AppDialog';
 import { fetchPetNote } from '@/lib/api/notes';
+import { likePet } from '@/lib/api/pets';
+import { fetchMyAdoptionRequests } from '@/lib/api/adoptionRequests';
 import { getPetReminder } from '@/lib/notifications/reminders';
 import {
   computeVerified,
@@ -55,6 +61,8 @@ export default function PetDetailScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { theme } = useTheme();
+  const { user, isAuthenticated } = useAuth();
+  const queryClient = useQueryClient();
   const { petId } = useLocalSearchParams<{ petId: string }>();
 
   const [rawPet, setRawPet] = useState<RawPet | null>(null);
@@ -62,10 +70,15 @@ export default function PetDetailScreen() {
   const [error, setError] = useState<string | null>(null);
   const [currentImg, setCurrentImg] = useState(0);
   const [liked, setLiked] = useState(false);
+  const [likesCount, setLikesCount] = useState<number>(0);
+  const [isLiking, setIsLiking] = useState(false);
   const [showFullDesc, setShowFullDesc] = useState(false);
   const [applied, setApplied] = useState(false);
   const [showNoteModal, setShowNoteModal] = useState(false);
   const [showReminderModal, setShowReminderModal] = useState(false);
+  const [showVerifyModal, setShowVerifyModal] = useState(false);
+  const [showAdoptionModal, setShowAdoptionModal] = useState(false);
+  const [dialogConfig, setDialogConfig] = useState<AppDialogProps | null>(null);
 
   const petNoteQuery = useQuery({
     queryKey: ['note', rawPet?.id],
@@ -104,6 +117,8 @@ export default function PetDetailScreen() {
       .then((data) => {
         if (!alive) return;
         setRawPet(data.pet);
+        setLiked(Boolean(data.pet.isLiked));
+        setLikesCount(data.pet.likesCount ?? 0);
       })
       .catch((err: unknown) => {
         if (!alive) return;
@@ -117,18 +132,132 @@ export default function PetDetailScreen() {
     return () => { alive = false; };
   }, [petId]);
 
-  const handleApply = useCallback(async () => {
-    if (!rawPet || applied) return;
-    try {
-      await apiRequest('/adoption-requests', {
-        method: 'POST',
-        body: JSON.stringify({ pet_id: rawPet.id }),
-      });
-      setApplied(true);
-    } catch {
-      setApplied(true);
+  // Kiểm tra xem người dùng đã gửi yêu cầu nhận nuôi cho bé này chưa
+  useEffect(() => {
+    let alive = true;
+    if (isAuthenticated && petId) {
+      fetchMyAdoptionRequests()
+        .then((requests) => {
+          if (!alive) return;
+          const found = requests.some((r) => r.pet_id === Number(petId));
+          if (found) setApplied(true);
+        })
+        .catch(() => {
+          // Silent ignore for non-blocking status check
+        });
     }
-  }, [rawPet, applied]);
+    return () => { alive = false; };
+  }, [isAuthenticated, petId]);
+
+  const handleLikeToggle = useCallback(async () => {
+    if (!isAuthenticated) {
+      setDialogConfig({
+        visible: true,
+        variant: 'info',
+        iconName: 'log-in-outline',
+        title: 'Đăng nhập tài khoản',
+        message: 'Vui lòng đăng nhập để lưu thú cưng vào danh sách yêu thích.',
+        confirmText: 'Đăng nhập ngay',
+        cancelText: 'Để sau',
+        onConfirm: () => {
+          setDialogConfig(null);
+          router.push('/(auth)/login');
+        },
+      });
+      return;
+    }
+
+    if (!rawPet || isLiking) return;
+    const prevLiked = liked;
+    const prevCount = likesCount;
+
+    // Optimistic update
+    setLiked(!prevLiked);
+    setLikesCount(prevLiked ? Math.max(0, prevCount - 1) : prevCount + 1);
+    setIsLiking(true);
+
+    try {
+      const res = await likePet(rawPet.id);
+      setLiked(res.isLiked);
+      setLikesCount(res.totalLikes);
+      queryClient.invalidateQueries({ queryKey: ['favorites'] });
+      queryClient.invalidateQueries({ queryKey: ['pet-detail', rawPet.id] });
+    } catch (err: unknown) {
+      // Rollback
+      setLiked(prevLiked);
+      setLikesCount(prevCount);
+      setDialogConfig({
+        visible: true,
+        variant: 'error',
+        title: 'Lỗi',
+        message: err instanceof Error ? err.message : 'Không thể cập nhật yêu thích. Vui lòng thử lại.',
+        singleButton: true,
+        confirmText: 'Đã hiểu',
+        onConfirm: () => setDialogConfig(null),
+      });
+    } finally {
+      setIsLiking(false);
+    }
+  }, [isAuthenticated, rawPet, isLiking, liked, likesCount, queryClient, router]);
+
+  const handleApply = useCallback(() => {
+    if (!rawPet) return;
+
+    if (applied) {
+      setDialogConfig({
+        visible: true,
+        variant: 'info',
+        iconName: 'hourglass-outline',
+        title: 'Đã đăng ký nhận nuôi',
+        message: 'Bạn đã nộp hồ sơ nhận nuôi cho bé này rồi. Bạn có muốn xem tiến độ hồ sơ không?',
+        confirmText: 'Xem hồ sơ của tôi',
+        cancelText: 'Đóng',
+        onConfirm: () => {
+          setDialogConfig(null);
+          router.push('/my-adoption-requests');
+        },
+      });
+      return;
+    }
+
+    if (!isAuthenticated || !user) {
+      setDialogConfig({
+        visible: true,
+        variant: 'info',
+        iconName: 'log-in-outline',
+        title: 'Đăng nhập tài khoản',
+        message: 'Vui lòng đăng nhập để gửi hồ sơ đăng ký nhận nuôi thú cưng.',
+        confirmText: 'Đăng nhập ngay',
+        cancelText: 'Để sau',
+        onConfirm: () => {
+          setDialogConfig(null);
+          router.push('/(auth)/login');
+        },
+      });
+      return;
+    }
+
+    // Kiểm tra verify email
+    if (Number(user.verify) !== 1) {
+      setDialogConfig({
+        visible: true,
+        variant: 'permission',
+        iconName: 'shield-checkmark-outline',
+        title: 'Xác minh Email tài khoản',
+        message: 'Bạn cần xác minh email trước khi gửi hồ sơ nhận nuôi thú cưng. Bấm "Xác minh ngay" để nhận mã OTP qua email.',
+        confirmText: 'Xác minh ngay',
+        cancelText: 'Để sau',
+        onConfirm: () => {
+          setDialogConfig(null);
+          setShowVerifyModal(true);
+        },
+      });
+      return;
+    }
+
+    // Nếu đã verify -> mở form nhận nuôi
+    setShowAdoptionModal(true);
+  }, [rawPet, applied, isAuthenticated, user, router]);
 
   if (loading) {
     return (
@@ -265,7 +394,8 @@ export default function PetDetailScreen() {
             </View>
             <Pressable
               style={[styles.heartBtn, { backgroundColor: liked ? theme.colors.primaryContainer : theme.colors.surface }]}
-              onPress={() => setLiked((l) => !l)}
+              onPress={handleLikeToggle}
+              disabled={isLiking}
             >
               <Ionicons name={liked ? 'heart' : 'heart-outline'} size={22} color={liked ? theme.colors.primary : theme.colors.muted} />
             </Pressable>
@@ -274,7 +404,9 @@ export default function PetDetailScreen() {
           {/* Likes count */}
           <View style={styles.likesRow}>
             <Ionicons name="heart" size={14} color={theme.colors.primary} />
-            <Text style={[styles.likesText, { color: theme.colors.muted }]}>-- người thích</Text>
+            <Text style={[styles.likesText, { color: theme.colors.muted }]}>
+              {likesCount > 0 ? `${likesCount} người thích` : 'Hãy là người đầu tiên thích bé'}
+            </Text>
           </View>
 
           {/* Traits */}
@@ -452,6 +584,77 @@ export default function PetDetailScreen() {
         petId={rawPet ? rawPet.id : null}
         petName={pet.name}
         onClose={() => setShowReminderModal(false)}
+      />
+
+      {/* Email Verification Modal */}
+      <VerifyEmailModal
+        visible={showVerifyModal}
+        onClose={() => setShowVerifyModal(false)}
+        onVerifiedSuccess={() => {
+          setShowVerifyModal(false);
+          // Tự động mở tiếp form nhận nuôi
+          setShowAdoptionModal(true);
+        }}
+      />
+
+      {/* Adoption Request Modal */}
+      <AdoptionRequestModal
+        visible={showAdoptionModal}
+        petId={rawPet ? rawPet.id : 0}
+        petName={pet.name}
+        petImage={rawPet ? (rawPet.image_url || rawPet.avatar_image || (rawPet.images && rawPet.images[0]?.image_path)) : null}
+        petBreed={rawPet?.breed ?? null}
+        onClose={() => setShowAdoptionModal(false)}
+        onSuccess={() => {
+          setApplied(true);
+          queryClient.invalidateQueries({ queryKey: ['my-adoption-requests'] });
+          setDialogConfig({
+            visible: true,
+            variant: 'success',
+            iconName: 'checkmark-circle-outline',
+            title: 'Đăng ký thành công! 🎉',
+            message: `Hồ sơ nhận nuôi ${pet.name} của bạn đã được gửi thành công tới trại cứu hộ. Bạn có thể theo dõi tiến độ xét duyệt tại mục Yêu cầu của tôi.`,
+            confirmText: 'Xem yêu cầu của tôi',
+            cancelText: 'Đóng',
+            onConfirm: () => {
+              setDialogConfig(null);
+              router.push('/my-adoption-requests');
+            },
+            onCancel: () => setDialogConfig(null),
+          });
+        }}
+        onErrorConflict={() => {
+          setApplied(true);
+          setDialogConfig({
+            visible: true,
+            variant: 'info',
+            iconName: 'hourglass-outline',
+            title: 'Bạn đã đăng ký rồi!',
+            message: 'Bạn đã gửi yêu cầu nhận nuôi cho thú cưng này trước đó. Vui lòng theo dõi tại mục Yêu cầu của tôi.',
+            confirmText: 'Xem yêu cầu của tôi',
+            cancelText: 'Đóng',
+            onConfirm: () => {
+              setDialogConfig(null);
+              router.push('/my-adoption-requests');
+            },
+            onCancel: () => setDialogConfig(null),
+          });
+        }}
+      />
+
+      {/* AppDialog dùng chung */}
+      <AppDialog
+        visible={Boolean(dialogConfig?.visible)}
+        title={dialogConfig?.title || ''}
+        message={dialogConfig?.message}
+        variant={dialogConfig?.variant}
+        iconName={dialogConfig?.iconName}
+        confirmText={dialogConfig?.confirmText}
+        cancelText={dialogConfig?.cancelText}
+        singleButton={dialogConfig?.singleButton}
+        loading={dialogConfig?.loading}
+        onConfirm={dialogConfig?.onConfirm}
+        onCancel={dialogConfig?.onCancel || (() => setDialogConfig(null))}
       />
     </View>
   );

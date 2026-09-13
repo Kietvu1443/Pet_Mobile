@@ -6,8 +6,7 @@
 //
 // Hook chỉ làm việc với model Pet (đã qua adapter) — không bao giờ chạm DTO thô.
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { fetchNextPet, postDislike, postLike } from '../api/petSnap';
-import { superLikeFavorite } from '../api/favorites';
+import { fetchNextPet, postDislike, postLike, postSuperLike } from '../api/petSnap';
 import { ApiError } from '../api/client';
 import { adaptPet, type Pet } from './adapter';
 import { queryClient } from '../query/queryClient';
@@ -96,10 +95,11 @@ export function usePetQueue() {
       try {
         let bundle;
         if (kind === 'superlike') {
-          await superLikeFavorite(petId);
-          bundle = await fetchNextPet();
+          bundle = await postSuperLike(petId);
+        } else if (kind === 'like') {
+          bundle = await postLike(petId);
         } else {
-          bundle = kind === 'like' ? await postLike(petId) : await postDislike(petId);
+          bundle = await postDislike(petId);
         }
         queryClient.invalidateQueries({ queryKey: ['favorites'] });
         hasMoreRef.current = bundle.hasMore;
@@ -115,6 +115,11 @@ export function usePetQueue() {
           setStatus('error');
           setErrorMsg(e instanceof Error ? e.message : 'Không thể xử lý thao tác');
         }
+        // Rollback optimistic removal on error
+        setQueue((prev) => {
+          const original = queue.find((p) => p.id === petId);
+          return original && !prev.some((p) => p.id === petId) ? [original, ...prev] : prev;
+        });
       } finally {
         setActing(false);
       }

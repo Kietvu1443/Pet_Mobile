@@ -44,6 +44,7 @@ import { useTheme } from '@/lib/theme/ThemeContext';
 
 import { usePetQueue } from '@/lib/snap/usePetQueue';
 import { apiRequest } from '@/lib/api/client';
+import { getDetailView } from '@/lib/api/petSnap';
 import {
   computeVerified,
   getMockTraits,
@@ -114,12 +115,14 @@ function SwipeCard({
   pet,
   onLike,
   onDislike,
+  onSuperlike,
   onDetail,
   isBehind = false,
 }: {
   pet: Pet;
   onLike: () => void;
   onDislike: () => void;
+  onSuperlike?: () => void;
   onDetail: () => void;
   isBehind?: boolean;
 }) {
@@ -177,7 +180,13 @@ function SwipeCard({
       } else if (e.translationX < -SWIPE_THRESHOLD && absX > absY) {
         tx.value = withTiming(-600, { duration: 300 }, () => { runOnJS(onDislike)(); });
       } else if (e.translationY < SUPERLIKE_THRESHOLD && absY > absX) {
-        ty.value = withTiming(-600, { duration: 300 }, () => { runOnJS(onLike)(); });
+        ty.value = withTiming(-600, { duration: 300 }, () => {
+          if (onSuperlike) {
+            runOnJS(onSuperlike)();
+          } else {
+            runOnJS(onLike)();
+          }
+        });
       } else {
         tx.value = withSpring(0, { stiffness: 400, damping: 30 });
         ty.value = withSpring(0, { stiffness: 400, damping: 30 });
@@ -466,6 +475,7 @@ export default function AdoptScreen() {
 
   const handleDetail = useCallback(() => {
     if (!currentPet) return;
+    void getDetailView(currentPet.id).catch(() => {});
     router.push(`/pet-detail?petId=${currentPet.id}` as any);
   }, [currentPet, router]);
 
@@ -547,6 +557,7 @@ export default function AdoptScreen() {
                     pet={nextPet}
                     onLike={() => {}}
                     onDislike={() => {}}
+                    onSuperlike={() => {}}
                     onDetail={() => {}}
                     isBehind
                   />
@@ -556,6 +567,7 @@ export default function AdoptScreen() {
                   pet={currentPet!}
                   onLike={handleLike}
                   onDislike={handleDislike}
+                  onSuperlike={handleSuperlike}
                   onDetail={handleDetail}
                 />
               </>

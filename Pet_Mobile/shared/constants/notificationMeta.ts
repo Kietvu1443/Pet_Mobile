@@ -66,6 +66,18 @@ export const NOTIFICATION_META: Record<string, NotificationMeta> = {
     color: '#FF4D4F',
     bg: '#FFF0F0',
   },
+  BEST_MATCH_STARTED: {
+    priority: 'success',
+    icon: 'infinite-outline',
+    color: '#D98F2B',
+    bg: '#FFF8EC',
+  },
+  BEST_MATCH_CANCELLED: {
+    priority: 'info',
+    icon: 'infinite-outline',
+    color: '#888888',
+    bg: '#F5F5F5',
+  },
   __default__: {
     priority: 'info',
     icon: 'notifications-outline',

@@ -35,6 +35,7 @@ import { getCurrentRoleLabel, getQuickRoleFromPreferences } from '@/lib/profile/
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
 import { fetchMyReports } from '@/lib/api/reports';
+import { fetchMyBestMatches, type BestMatchSummary } from '@/lib/api/bestMatches';
 
 // Adoption request count from backend
 type AdoptionRequestsResponse = { requests: { status?: string }[]; total?: number };
@@ -73,6 +74,7 @@ export default function ProfileScreen() {
   const { t } = useTranslation(['profile', 'common', 'auth']);
 
   const [adoptionCount, setAdoptionCount] = useState(0);
+  const [bestMatches, setBestMatches] = useState<BestMatchSummary[]>([]);
   const [matchCount, setMatchCount] = useState(0);
   const [scanCount, setScanCount] = useState(0);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
@@ -93,14 +95,16 @@ export default function ProfileScreen() {
 
   // Shared callback used by both focus refresh and pull-to-refresh
   const refreshData = useCallback(async () => {
-    const [stats, scanRes, activeReviewRes] = await Promise.all([
+    const [stats, scanRes, activeReviewRes, myBestMatches] = await Promise.all([
       fetchAdoptionStats(),
       apiRequest<{ total: number }>('/auth/scan-count').catch(() => ({ total: 0 })),
       apiRequest<{ review: any | null }>('/housing-reviews/active').catch(() => ({ review: null })),
+      fetchMyBestMatches().catch(() => []),
     ]);
     await refreshUser();
     setAdoptionCount(stats.count);
-    setMatchCount(stats.matchCount);
+    setBestMatches(myBestMatches);
+    setMatchCount(myBestMatches.length > 0 ? myBestMatches.length : stats.matchCount);
     setScanCount(scanRes.total);
     setActiveReview(activeReviewRes?.review ?? null);
   }, [refreshUser]);
@@ -247,6 +251,8 @@ export default function ProfileScreen() {
     { count: adoptionCount, label: t('profile:adoptionCount'), sublabel: adoptionCount === 0 ? t('profile:noData') : '', color: '#34C759' },
   ];
 
+  const showBestMatchRing = bestMatches.some((bm) => bm.show_ring_badge === true);
+
   return (
     <View style={[styles.screen, { backgroundColor: theme.colors.background }]}>
       <ScrollView
@@ -285,6 +291,16 @@ export default function ProfileScreen() {
             <View style={styles.editBadge}>
               <Ionicons name="pencil" size={10} color={theme.colors.primary} />
             </View>
+            {bestMatches.length > 0 && showBestMatchRing && (
+              <Pressable
+                accessibilityLabel="Best Match"
+                hitSlop={6}
+                style={({ pressed }) => [styles.bestMatchRingBadge, pressed && { opacity: 0.8 }]}
+                onPress={() => router.push('/best-match' as Parameters<typeof router.push>[0])}
+              >
+                <Ionicons name="infinite" size={13} color="#D98F2B" />
+              </Pressable>
+            )}
           </View>
 
           {/* Info */}
@@ -467,11 +483,11 @@ const styles = StyleSheet.create({
   },
   editBadge: {
     position: 'absolute',
-    bottom: -2,
+    top: -2,
     right: -2,
-    width: 26,
-    height: 26,
-    borderRadius: 13,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
     backgroundColor: 'white',
     alignItems: 'center',
     justifyContent: 'center',
@@ -480,6 +496,24 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.12,
     shadowRadius: 4,
     elevation: 4,
+  },
+  bestMatchRingBadge: {
+    position: 'absolute',
+    bottom: -2,
+    right: -2,
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: 'white',
+    borderWidth: 2,
+    borderColor: '#F6C978',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.12,
+    shadowRadius: 4,
+    elevation: 5,
   },
   heroInfo: {
     flex: 1,

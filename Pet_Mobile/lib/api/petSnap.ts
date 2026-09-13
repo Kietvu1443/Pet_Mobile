@@ -65,3 +65,19 @@ export function postLike(petId: number): Promise<RawPetSnapBundle> {
 export function postDislike(petId: number): Promise<RawPetSnapBundle> {
   return apiRequest<RawPetSnapBundle>(`/pet-snap/${petId}/dislike`, { method: 'POST' });
 }
+
+export function postSuperLike(petId: number): Promise<RawPetSnapBundle> {
+  return apiRequest<RawPetSnapBundle>(`/pet-snap/${petId}/super-like`, { method: 'POST' });
+}
+
+export function getDetailView(petId: number): Promise<{ success: boolean; petId: number }> {
+  return apiRequest<{ success: boolean; petId: number }>(`/pet-snap/${petId}/detail-view`);
+}
+
+export function fetchLikedPets(signal?: AbortSignal): Promise<{ pets: RawPet[]; total: number }> {
+  return apiRequest<{ pets: RawPet[]; total: number }>('/pet-snap/liked-pets', { signal });
+}
+
+export function postUnlike(petId: number): Promise<{ petId: number; status: string; success: boolean }> {
+  return apiRequest<{ petId: number; status: string; success: boolean }>(`/pet-snap/${petId}/unlike`, { method: 'POST' });
+}

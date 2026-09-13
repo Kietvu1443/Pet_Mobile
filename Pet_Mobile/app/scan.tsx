@@ -2,6 +2,7 @@ import React, { useState, useRef, useCallback } from 'react';
 import {
   ActivityIndicator,
   Dimensions,
+  Linking,
   Modal,
   Pressable,
   StyleSheet,
@@ -350,10 +351,11 @@ function ActiveCameraInner({
   onClose: () => void;
 }) {
   const [permission, requestPermission] = ExpoCamera!.useCameraPermissions();
+  const [showSettingsPrompt, setShowSettingsPrompt] = useState(false);
 
   if (!permission) {
     return (
-      <View style={[styles.centerContainer, { backgroundColor: '#111827' }]}>
+      <View style={[StyleSheet.absoluteFillObject, styles.centerContainer, { backgroundColor: '#111827' }]}>
         <ActivityIndicator size="large" color="#38BDF8" />
       </View>
     );
@@ -361,31 +363,42 @@ function ActiveCameraInner({
 
   if (!permission.granted) {
     return (
-      <View style={[styles.centerContainer, { backgroundColor: theme.colors.background, padding: 24 }]}>
-        <View style={[styles.permissionIconCircle, { backgroundColor: theme.colors.surface }]}>
-          <Ionicons name="camera-outline" size={48} color={theme.colors.primary} />
-        </View>
-        <Text style={[styles.permissionTitle, { color: theme.colors.text }]}>
-          Quyền truy cập Camera
-        </Text>
-        <Text style={[styles.permissionDesc, { color: theme.colors.muted }]}>
-          Pet Helper cần sử dụng camera để quét mã QR và xem hồ sơ công khai của thú cưng.
-        </Text>
-        <Pressable
-          style={({ pressed }) => [
-            styles.permissionBtn,
-            { backgroundColor: theme.colors.primary },
-            pressed && { opacity: 0.88, transform: [{ scale: 0.98 }] },
-          ]}
-          onPress={requestPermission}
-        >
-          <Text style={styles.permissionBtnText}>Cấp quyền truy cập máy ảnh</Text>
-        </Pressable>
-
-        <Pressable style={styles.permissionBackBtn} onPress={onClose}>
-          <Text style={[styles.permissionBackText, { color: theme.colors.muted }]}>Quay lại</Text>
-        </Pressable>
-      </View>
+      <>
+        {showSettingsPrompt || (!permission.canAskAgain && permission.status === 'denied') ? (
+          <AppDialog
+            visible={true}
+            variant="warning"
+            iconName="settings-outline"
+            title="Cần cấp quyền trong Cài đặt"
+            message="Quyền truy cập máy ảnh đã bị từ chối. Vui lòng mở Cài đặt thiết bị để cho phép Pet Helper sử dụng camera."
+            confirmText="Mở Cài đặt"
+            cancelText="Quay lại"
+            onConfirm={async () => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              await Linking.openSettings();
+            }}
+            onCancel={onClose}
+          />
+        ) : (
+          <AppDialog
+            visible={true}
+            variant="permission"
+            iconName="camera-outline"
+            title="Quyền truy cập Camera"
+            message="Pet Helper cần sử dụng camera để quét mã QR và xem hồ sơ công khai của thú cưng."
+            confirmText="Cấp quyền"
+            cancelText="Quay lại"
+            onConfirm={async () => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+              const res = await requestPermission();
+              if (res && !res.granted && !res.canAskAgain) {
+                setShowSettingsPrompt(true);
+              }
+            }}
+            onCancel={onClose}
+          />
+        )}
+      </>
     );
   }
 
@@ -483,45 +496,6 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 15,
     fontFamily: 'Fredoka-SemiBold',
-  },
-  permissionIconCircle: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  permissionTitle: {
-    fontSize: 20,
-    fontFamily: 'Fredoka-SemiBold',
-    marginBottom: 8,
-  },
-  permissionDesc: {
-    fontSize: 14,
-    textAlign: 'center',
-    lineHeight: 20,
-    marginBottom: 24,
-    maxWidth: 280,
-  },
-  permissionBtn: {
-    height: 48,
-    paddingHorizontal: 28,
-    borderRadius: 16,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  permissionBtnText: {
-    color: '#FFFFFF',
-    fontSize: 15,
-    fontFamily: 'Fredoka-SemiBold',
-  },
-  permissionBackBtn: {
-    padding: 10,
-  },
-  permissionBackText: {
-    fontSize: 14,
   },
   topBar: {
     position: 'absolute',

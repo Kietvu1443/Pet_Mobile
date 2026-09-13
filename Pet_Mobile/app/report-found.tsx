@@ -17,6 +17,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
+import * as Haptics from 'expo-haptics';
 import { useQueryClient } from '@tanstack/react-query';
 
 import { submitReport } from '@/lib/api/reports';
@@ -110,6 +111,7 @@ export default function ReportFoundScreen() {
   };
 
   const handleRemoveImage = (index: number) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setImages((prev) => prev.filter((_, i) => i !== index));
   };
 
@@ -221,7 +223,10 @@ export default function ReportFoundScreen() {
               { backgroundColor: theme.colors.card },
               pressed && { opacity: 0.7 },
             ]}
-            onPress={() => router.back()}
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              router.back();
+            }}
           >
             <Ionicons name="chevron-back" size={22} color={theme.colors.text} />
           </Pressable>
@@ -286,7 +291,10 @@ export default function ReportFoundScreen() {
                       borderColor: imageError ? theme.colors.error : theme.colors.border,
                     },
                   ]}
-                  onPress={handlePickImages}
+                  onPress={() => {
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                    handlePickImages();
+                  }}
                 >
                   <Ionicons name="camera-outline" size={26} color={theme.colors.muted} />
                   <Text style={[styles.addImageText, { color: theme.colors.muted }]}>
@@ -320,7 +328,10 @@ export default function ReportFoundScreen() {
                         borderColor: active ? theme.colors.primary : theme.colors.border,
                       },
                     ]}
-                    onPress={() => setSpecies(type)}
+                    onPress={() => {
+                      Haptics.selectionAsync();
+                      setSpecies(type);
+                    }}
                   >
                     <Text style={[styles.chipText, { color: active ? 'white' : theme.colors.text }]}>
                       {type === 'Chó' ? '🐶 Chó' : type === 'Mèo' ? '🐱 Mèo' : '🐾 Khác'}
@@ -399,7 +410,10 @@ export default function ReportFoundScreen() {
                           borderColor: active ? theme.colors.primary : theme.colors.border,
                         },
                       ]}
-                      onPress={() => setGender(id as Gender)}
+                      onPress={() => {
+                        Haptics.selectionAsync();
+                        setGender(id as Gender);
+                      }}
                     >
                       <Text style={[styles.miniChipText, { color: active ? 'white' : theme.colors.text }]}>
                         {label}
@@ -524,7 +538,10 @@ export default function ReportFoundScreen() {
               submitting && { opacity: 0.6 },
               pressed && { opacity: 0.88, transform: [{ scale: 0.98 }] },
             ]}
-            onPress={handleSubmit}
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+              handleSubmit();
+            }}
             disabled={submitting}
           >
             {submitting ? (

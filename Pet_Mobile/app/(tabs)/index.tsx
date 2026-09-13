@@ -40,6 +40,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useUnreadNotifications } from '@/lib/notifications/unread';
 import { useTranslation } from 'react-i18next';
 import { useRouter } from 'expo-router';
+import * as Haptics from 'expo-haptics';
 import { useTheme } from '@/lib/theme/ThemeContext';
 
 import { usePetQueue } from '@/lib/snap/usePetQueue';
@@ -165,21 +166,43 @@ function SwipeCard({
     opacity: interpolate(ty.value, [-110, -40], [1, 0], Extrapolation.CLAMP),
   }));
 
+  const hasCrossedThreshold = useSharedValue(false);
+
+  const triggerHaptic = (style: Haptics.ImpactFeedbackStyle) => {
+    Haptics.impactAsync(style);
+  };
+
+  const triggerSelectionHaptic = () => {
+    Haptics.selectionAsync();
+  };
+
   const pan = Gesture.Pan()
     .onUpdate((e) => {
       if (isBehind) return;
       tx.value = e.translationX;
       ty.value = e.translationY;
+
+      const passed = Math.abs(e.translationX) > SWIPE_THRESHOLD || e.translationY < SUPERLIKE_THRESHOLD;
+      if (passed && !hasCrossedThreshold.value) {
+        hasCrossedThreshold.value = true;
+        runOnJS(triggerSelectionHaptic)();
+      } else if (!passed && hasCrossedThreshold.value) {
+        hasCrossedThreshold.value = false;
+      }
     })
     .onEnd((e) => {
       if (isBehind) return;
+      hasCrossedThreshold.value = false;
       const absX = Math.abs(e.translationX);
       const absY = Math.abs(e.translationY);
       if (e.translationX > SWIPE_THRESHOLD && absX > absY) {
+        runOnJS(triggerHaptic)(Haptics.ImpactFeedbackStyle.Medium);
         tx.value = withTiming(600, { duration: 300 }, () => { runOnJS(onLike)(); });
       } else if (e.translationX < -SWIPE_THRESHOLD && absX > absY) {
+        runOnJS(triggerHaptic)(Haptics.ImpactFeedbackStyle.Light);
         tx.value = withTiming(-600, { duration: 300 }, () => { runOnJS(onDislike)(); });
       } else if (e.translationY < SUPERLIKE_THRESHOLD && absY > absX) {
+        runOnJS(triggerHaptic)(Haptics.ImpactFeedbackStyle.Heavy);
         ty.value = withTiming(-600, { duration: 300 }, () => {
           if (onSuperlike) {
             runOnJS(onSuperlike)();
@@ -291,9 +314,15 @@ function ActionBtn({
   disabled?: boolean;
 }) {
   const { theme } = useTheme();
+
+  const handlePress = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    onPress();
+  };
+
   return (
     <Pressable
-      onPress={onPress}
+      onPress={handlePress}
       disabled={disabled}
       style={({ pressed }) => [
         styles.actionBtn,

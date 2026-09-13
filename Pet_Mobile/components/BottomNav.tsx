@@ -21,6 +21,8 @@ import Animated, {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
+import { useRouter } from 'expo-router';
+import * as Haptics from 'expo-haptics';
 
 import { useTheme } from '@/lib/theme/ThemeContext';
 
@@ -75,6 +77,7 @@ function NavTab({
   }));
 
   const handlePress = () => {
+    Haptics.selectionAsync();
     scale.value = withSpring(0.90, { stiffness: 400, damping: 25 }, () => {
       scale.value = withSpring(1, { stiffness: 400, damping: 25 });
     });
@@ -123,10 +126,14 @@ export function BottomNav({ activeTab, onTabChange }: BottomNavProps) {
     transform: [{ translateX: indicatorX.value }],
   }));
 
+  const router = useRouter();
+
   const handleFabPress = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     fabScale.value = withSpring(0.86, { stiffness: 500, damping: 24 }, () => {
       fabScale.value = withSpring(1, { stiffness: 500, damping: 24 });
     });
+    router.push('/scan');
   };
 
   const handleTabLayout = useCallback((tabId: Tab, x: number, width: number) => {

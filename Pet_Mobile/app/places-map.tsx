@@ -12,6 +12,7 @@ import {
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialIcons, Ionicons } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
 import { useQueryClient } from '@tanstack/react-query';
 import { AppDialog, AppDialogProps } from '../components/ui/AppDialog';
 import {
@@ -450,7 +451,10 @@ export default function PlacesMapScreen() {
 
           <View style={styles.topRightActions}>
             <Pressable
-              onPress={handleCenterUser}
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                handleCenterUser();
+              }}
               hitSlop={12}
               disabled={isLocating}
               style={({ pressed }) => [styles.floatingCircleBtn, pressed && { opacity: 0.8 }]}
@@ -467,7 +471,10 @@ export default function PlacesMapScreen() {
             </Pressable>
 
             <Pressable
-              onPress={() => router.push('/add-place' as any)}
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                router.push('/add-place' as any);
+              }}
               hitSlop={12}
               style={({ pressed }) => [
                 styles.floatingCircleBtn,
@@ -491,7 +498,10 @@ export default function PlacesMapScreen() {
             const isSelected = selectedType === item.id;
             return (
               <Pressable
-                onPress={() => setSelectedType(item.id)}
+                onPress={() => {
+                  Haptics.selectionAsync();
+                  setSelectedType(item.id);
+                }}
                 style={[
                   styles.filterChip,
                   isSelected && styles.filterChipSelected,
@@ -518,7 +528,10 @@ export default function PlacesMapScreen() {
 
       {/* Floating Add Place Button */}
       <Pressable
-        onPress={() => router.push('/add-place' as any)}
+        onPress={() => {
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+          router.push('/add-place' as any);
+        }}
         style={({ pressed }) => [
           styles.addPlaceFab,
           { bottom: insets.bottom + 235 },

@@ -20,7 +20,24 @@
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": [
+            {
+              "scheme": "https",
+              "host": "pethelper.app",
+              "pathPrefix": "/pet"
+            }
+          ],
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
+        }
+      ]
     },
     "web": {
       "output": "static",
@@ -38,6 +55,12 @@
     "plugins": [
       "expo-router",
       "expo-updates",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Cho phép Pet Helper truy cập camera để quét mã QR thú cưng."
+        }
+      ],
       [
         "expo-splash-screen",
         {

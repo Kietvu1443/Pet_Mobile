@@ -24,6 +24,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useUnreadNotifications } from '@/lib/notifications/unread';
 import { useTranslation } from 'react-i18next';
 import { useTheme } from '@/lib/theme/ThemeContext';
+import * as Haptics from 'expo-haptics';
 import { resolveImageUrl } from '@/lib/images/resolveUrl';
 import {
   fetchMyPets,
@@ -50,7 +51,10 @@ function EmptyState({ onAdd }: { onAdd: () => void }) {
           { backgroundColor: theme.colors.primary, shadowColor: theme.colors.primary },
           pressed && { opacity: 0.85 },
         ]}
-        onPress={onAdd}
+        onPress={() => {
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+          onAdd();
+        }}
       >
         <Ionicons name="add" size={20} color="white" />
         <Text style={styles.addBigBtnText}>Thêm thú cưng</Text>
@@ -195,7 +199,10 @@ export default function MyPetsScreen() {
           </Pressable>
           <Pressable
             style={[styles.addIconBtn, { backgroundColor: theme.colors.primary, shadowColor: theme.colors.primary }]}
-            onPress={() => router.push('/add-pet' as Parameters<typeof router.push>[0])}
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              router.push('/add-pet' as Parameters<typeof router.push>[0]);
+            }}
           >
             <Ionicons name="add" size={22} color="white" />
           </Pressable>
@@ -221,7 +228,10 @@ export default function MyPetsScreen() {
           {/* Add more dashed button */}
           <Pressable
             style={({ pressed }) => [styles.addMoreBtn, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }, pressed && { opacity: 0.7 }]}
-            onPress={() => router.push('/add-pet' as Parameters<typeof router.push>[0])}
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              router.push('/add-pet' as Parameters<typeof router.push>[0]);
+            }}
           >
             <View style={[styles.addMoreIcon, { backgroundColor: theme.colors.primaryContainer }]}>
               <Ionicons name="add" size={18} color={theme.colors.primary} />

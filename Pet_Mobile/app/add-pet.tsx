@@ -25,6 +25,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
+import * as Haptics from 'expo-haptics';
 
 import { useTheme } from '@/lib/theme/ThemeContext';
 import { createUserPet, formatAgeFromBirthDate } from '@/lib/api/userPets';
@@ -122,13 +123,25 @@ function Step1({
                       <Text style={styles.avatarBadgeText}>Ảnh chính</Text>
                     </View>
                   )}
-                  <Pressable style={styles.removeImageBtn} onPress={() => removeImage(idx)}>
+                  <Pressable
+                    style={styles.removeImageBtn}
+                    onPress={() => {
+                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                      removeImage(idx);
+                    }}
+                  >
                     <Ionicons name="close" size={14} color="white" />
                   </Pressable>
                 </View>
               ))}
               {images.length < 5 && (
-                <Pressable style={styles.addMoreImageBtn} onPress={pickImages}>
+                <Pressable
+                  style={styles.addMoreImageBtn}
+                  onPress={() => {
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                    pickImages();
+                  }}
+                >
                   <Ionicons name="add" size={24} color="#FF4FA3" />
                   <Text style={styles.addMoreImageText}>Thêm</Text>
                 </Pressable>
@@ -138,7 +151,13 @@ function Step1({
         )}
 
         {images.length === 0 && (
-          <Pressable style={styles.photoUpload} onPress={pickImages}>
+          <Pressable
+            style={styles.photoUpload}
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              pickImages();
+            }}
+          >
             <View style={styles.cameraIcon}>
               <Ionicons name="camera" size={26} color="#FF4FA3" />
             </View>
@@ -156,7 +175,10 @@ function Step1({
             <Pressable
               key={s.id}
               style={[styles.speciesBtn, species === s.id && styles.speciesBtnActive]}
-              onPress={() => setSpecies(s.id)}
+              onPress={() => {
+                Haptics.selectionAsync();
+                setSpecies(s.id);
+              }}
             >
               <Text style={styles.speciesEmoji}>{s.emoji}</Text>
               <Text style={[styles.speciesLabel, species === s.id && styles.speciesLabelActive]}>
@@ -199,7 +221,10 @@ function Step1({
             <Pressable
               key={g}
               style={[styles.genderBtn, gender === g && styles.genderBtnActive]}
-              onPress={() => setGender(g)}
+              onPress={() => {
+                Haptics.selectionAsync();
+                setGender(g);
+              }}
             >
               <Text style={[styles.genderBtnText, gender === g && styles.genderBtnTextActive]}>
                 {g === 'male' ? '♂ Đực' : '♀ Cái'}
@@ -279,7 +304,10 @@ function Step2({
         <View style={styles.genderRow}>
           <Pressable
             style={[styles.genderBtn, vaccinated && styles.genderBtnActive]}
-            onPress={() => setVaccinated(true)}
+            onPress={() => {
+              Haptics.selectionAsync();
+              setVaccinated(true);
+            }}
           >
             <Text style={[styles.genderBtnText, vaccinated && styles.genderBtnTextActive]}>
               ✓ Đã tiêm phòng
@@ -287,7 +315,10 @@ function Step2({
           </Pressable>
           <Pressable
             style={[styles.genderBtn, !vaccinated && styles.genderBtnActive]}
-            onPress={() => setVaccinated(false)}
+            onPress={() => {
+              Haptics.selectionAsync();
+              setVaccinated(false);
+            }}
           >
             <Text style={[styles.genderBtnText, !vaccinated && styles.genderBtnTextActive]}>
               Chưa tiêm phòng
@@ -306,7 +337,14 @@ function Step2({
         {traits.length > 0 && (
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 12 }}>
             {traits.map((t) => (
-              <Pressable key={t} onPress={() => toggleTrait(t)} style={styles.traitSelected}>
+              <Pressable
+                key={t}
+                onPress={() => {
+                  Haptics.selectionAsync();
+                  toggleTrait(t);
+                }}
+                style={styles.traitSelected}
+              >
                 <Text style={styles.traitSelectedText}>{t} ×</Text>
               </Pressable>
             ))}
@@ -320,10 +358,19 @@ function Step2({
             onChangeText={setTraitInput}
             placeholder="Nhập tính cách..."
             placeholderTextColor={theme.colors.muted}
-            onSubmitEditing={addCustomTrait}
+            onSubmitEditing={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              addCustomTrait();
+            }}
             returnKeyType="done"
           />
-          <Pressable style={styles.addTraitBtn} onPress={addCustomTrait}>
+          <Pressable
+            style={styles.addTraitBtn}
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              addCustomTrait();
+            }}
+          >
             <Text style={styles.addTraitBtnText}>Thêm</Text>
           </Pressable>
         </View>
@@ -331,7 +378,14 @@ function Step2({
         <Text style={{ fontSize: 12, color: '#AAAAAA', marginTop: 12, marginBottom: 10 }}>Gợi ý</Text>
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
           {TRAITS_SUGGESTIONS.filter((s) => !traits.includes(s)).map((t) => (
-            <Pressable key={t} style={styles.traitSuggestion} onPress={() => toggleTrait(t)}>
+            <Pressable
+              key={t}
+              style={styles.traitSuggestion}
+              onPress={() => {
+                Haptics.selectionAsync();
+                toggleTrait(t);
+              }}
+            >
               <Ionicons name="add" size={12} color="#888" />
               <Text style={styles.traitSuggestionText}>{t}</Text>
             </Pressable>
@@ -565,14 +619,18 @@ export default function AddPetScreen() {
   const handleNext = () => {
     if (step === 1) {
       if (!name.trim()) {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
         setNameError('Vui lòng nhập tên cho bé trước khi tiếp tục');
         return;
       }
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
       setNameError(null);
       setStep(2);
     } else if (step === 2) {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
       setStep(3);
     } else {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
       handleSubmit();
     }
   };
@@ -587,7 +645,13 @@ export default function AddPetScreen() {
       <View style={[styles.screen, { backgroundColor: theme.colors.background, paddingTop: insets.top }]}>
         {/* Header */}
         <View style={styles.header}>
-          <Pressable style={({ pressed }) => [styles.backBtn, { backgroundColor: theme.colors.card }, pressed && { opacity: 0.7 }]} onPress={() => router.back()}>
+          <Pressable
+            style={({ pressed }) => [styles.backBtn, { backgroundColor: theme.colors.card }, pressed && { opacity: 0.7 }]}
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              router.back();
+            }}
+          >
             <Ionicons name="chevron-back" size={22} color={theme.colors.text} />
           </Pressable>
           <Text style={[styles.headerTitle, { color: theme.colors.text }]}>Thêm thú cưng</Text>
@@ -661,7 +725,10 @@ export default function AddPetScreen() {
             <Pressable
               disabled={isSubmitting}
               style={({ pressed }) => [styles.prevBtn, { borderColor: theme.colors.border }, pressed && { opacity: 0.7 }]}
-              onPress={() => setStep((s) => s - 1)}
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                setStep((s) => s - 1);
+              }}
             >
               <Text style={[styles.prevBtnText, { color: theme.colors.text }]}>Quay lại</Text>
             </Pressable>

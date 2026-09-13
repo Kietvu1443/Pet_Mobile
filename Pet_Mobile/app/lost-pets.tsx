@@ -13,6 +13,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import * as Haptics from 'expo-haptics';
 import { useInfiniteQuery } from '@tanstack/react-query';
 
 import { fetchPublicReports, type RawReportItem, type ReportType } from '@/lib/api/reports';
@@ -445,7 +446,10 @@ export default function LostPetsScreen() {
             { backgroundColor: '#DC2626' },
             pressed && { opacity: 0.85, transform: [{ scale: 0.98 }] },
           ]}
-          onPress={() => router.push('/report-lost')}
+          onPress={() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+            router.push('/report-lost');
+          }}
         >
           <Ionicons name="alert-circle" size={18} color="white" />
           <Text style={styles.fabText}>Báo mất pet</Text>
@@ -458,7 +462,10 @@ export default function LostPetsScreen() {
             { backgroundColor: '#059669' },
             pressed && { opacity: 0.85, transform: [{ scale: 0.98 }] },
           ]}
-          onPress={() => router.push('/report-found')}
+          onPress={() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+            router.push('/report-found');
+          }}
         >
           <Ionicons name="compass" size={18} color="white" />
           <Text style={styles.fabText}>Báo nhặt được</Text>

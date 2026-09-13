@@ -25,6 +25,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 
 import { useTheme } from '@/lib/theme/ThemeContext';
+import * as Haptics from 'expo-haptics';
 import { resolveImageUrl } from '@/lib/images/resolveUrl';
 import {
   fetchBestMatchProfile,
@@ -169,7 +170,10 @@ export default function BestMatchProfileScreen() {
 
           <Pressable
             style={[styles.floatingNavBtn, { top: insets.top + 12, left: 20, backgroundColor: theme.isDark ? 'rgba(30,30,30,0.85)' : 'rgba(255,255,255,0.92)' }]}
-            onPress={() => router.back()}
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              router.back();
+            }}
           >
             <Ionicons name="chevron-back" size={22} color={theme.colors.text} />
           </Pressable>
@@ -204,7 +208,13 @@ export default function BestMatchProfileScreen() {
           <View style={styles.sectionHeaderRow}>
             <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Câu chuyện của chúng ta</Text>
             {is_owner && stories.length > 0 && (
-              <Pressable style={({ pressed }) => [styles.addStoryBtn, { backgroundColor: theme.colors.primary }, pressed && { opacity: 0.85 }]} onPress={openCreateModal}>
+              <Pressable
+                style={({ pressed }) => [styles.addStoryBtn, { backgroundColor: theme.colors.primary }, pressed && { opacity: 0.85 }]}
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                  openCreateModal();
+                }}
+              >
                 <Ionicons name="add" size={16} color="white" />
                 <Text style={styles.addStoryBtnText}>Lưu kỷ niệm</Text>
               </Pressable>
@@ -217,7 +227,13 @@ export default function BestMatchProfileScreen() {
                 Mỗi hành trình đều bắt đầu trong yên lặng.{'\n'}Khi nào bạn muốn, hãy lưu lại một kỷ niệm ở đây.
               </Text>
               {is_owner && (
-                <Pressable style={({ pressed }) => [styles.saveMemoryBtn, { backgroundColor: theme.colors.primary }, pressed && { opacity: 0.85 }]} onPress={openCreateModal}>
+                <Pressable
+                  style={({ pressed }) => [styles.saveMemoryBtn, { backgroundColor: theme.colors.primary }, pressed && { opacity: 0.85 }]}
+                  onPress={() => {
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                    openCreateModal();
+                  }}
+                >
                   <Ionicons name="heart-outline" size={16} color="white" />
                   <Text style={styles.saveMemoryBtnText}>Lưu một kỷ niệm</Text>
                 </Pressable>

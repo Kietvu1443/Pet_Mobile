@@ -16,6 +16,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
+import * as Haptics from "expo-haptics";
 import { useFocusEffect, useRouter } from "expo-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
@@ -1461,6 +1462,7 @@ export default function FavoritesScreen() {
               pressed && { opacity: 0.9, transform: [{ scale: 0.97 }] },
             ]}
             onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
               router.push({
                 pathname: "/compare-pets",
                 params: { petIds: selectedForCompare.join(",") },

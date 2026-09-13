@@ -41,6 +41,9 @@ import { PetReminderModal } from '@/components/PetReminderModal';
 import { VerifyEmailModal } from '@/components/VerifyEmailModal';
 import { AdoptionRequestModal } from '@/components/AdoptionRequestModal';
 import { AppDialog, type AppDialogProps } from '@/components/ui/AppDialog';
+import { PetQrModal } from '@/components/PetQrModal';
+import { fetchShelterPetQrShare, type QrShareData } from '@/lib/api/publicPets';
+import * as Haptics from 'expo-haptics';
 import { fetchPetNote } from '@/lib/api/notes';
 import { likePet } from '@/lib/api/pets';
 import { fetchMyAdoptionRequests } from '@/lib/api/adoptionRequests';
@@ -79,6 +82,22 @@ export default function PetDetailScreen() {
   const [showVerifyModal, setShowVerifyModal] = useState(false);
   const [showAdoptionModal, setShowAdoptionModal] = useState(false);
   const [dialogConfig, setDialogConfig] = useState<AppDialogProps | null>(null);
+  const [qrModalVisible, setQrModalVisible] = useState(false);
+  const [qrData, setQrData] = useState<QrShareData | null>(null);
+
+  const handleOpenQr = async () => {
+    if (!rawPet) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setQrModalVisible(true);
+    if (!qrData) {
+      try {
+        const data = await fetchShelterPetQrShare(rawPet.id);
+        setQrData(data);
+      } catch (err) {
+        console.warn('Fetch shelter pet QR error:', err);
+      }
+    }
+  };
 
   const petNoteQuery = useQuery({
     queryKey: ['note', rawPet?.id],
@@ -172,6 +191,7 @@ export default function PetDetailScreen() {
     const prevCount = likesCount;
 
     // Optimistic update
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setLiked(!prevLiked);
     setLikesCount(prevLiked ? Math.max(0, prevCount - 1) : prevCount + 1);
     setIsLiking(true);
@@ -339,8 +359,19 @@ export default function PetDetailScreen() {
             </View>
           )}
 
+          {/* QR Code button */}
+          <Pressable
+            style={[styles.navBtn, { backgroundColor: theme.isDark ? 'rgba(30,30,30,0.85)' : 'rgba(255,255,255,0.92)', top: insets.top + 14, right: 68 }]}
+            onPress={handleOpenQr}
+          >
+            <Ionicons name="qr-code-outline" size={20} color={theme.colors.text} />
+          </Pressable>
+
           {/* Share button */}
-          <Pressable style={[styles.navBtn, { backgroundColor: theme.isDark ? 'rgba(30,30,30,0.85)' : 'rgba(255,255,255,0.92)', top: insets.top + 14, right: 20 }]}>
+          <Pressable
+            style={[styles.navBtn, { backgroundColor: theme.isDark ? 'rgba(30,30,30,0.85)' : 'rgba(255,255,255,0.92)', top: insets.top + 14, right: 20 }]}
+            onPress={handleOpenQr}
+          >
             <Ionicons name="share-outline" size={20} color={theme.colors.text} />
           </Pressable>
 
@@ -641,6 +672,19 @@ export default function PetDetailScreen() {
           });
         }}
       />
+
+      {/* Pet QR Modal */}
+      {rawPet && (
+        <PetQrModal
+          visible={qrModalVisible}
+          onClose={() => setQrModalVisible(false)}
+          petName={pet.name}
+          token={qrData?.token}
+          canonicalUrl={qrData?.canonicalUrl}
+          petImageUrl={allImages.length > 0 ? allImages[0] : null}
+          petTypeLabel="Thú cưng cứu hộ"
+        />
+      )}
 
       {/* AppDialog dùng chung */}
       <AppDialog

@@ -95,13 +95,30 @@ export const SwipeDeck = forwardRef<SwipeDeckHandle, Props>(function SwipeDeck(
   // Phơi like()/dislike() cho footer — dùng chung fly() nên giữ nguyên animation.
   useImperativeHandle(ref, () => ({ like: () => fly(1), dislike: () => fly(-1) }), [fly]);
 
+  const hasCrossedThreshold = useSharedValue(false);
+
+  const triggerThresholdBuzz = useCallback(() => {
+    if (Platform.OS !== 'web') {
+      void Haptics.selectionAsync();
+    }
+  }, []);
+
   const pan = Gesture.Pan()
     .enabled(!!top && !acting)
     .onUpdate((e) => {
       translateX.value = e.translationX;
       translateY.value = e.translationY * 0.25; // hạn chế trôi dọc
+
+      const passed = Math.abs(e.translationX) > SWIPE_THRESHOLD;
+      if (passed && !hasCrossedThreshold.value) {
+        hasCrossedThreshold.value = true;
+        runOnJS(triggerThresholdBuzz)();
+      } else if (!passed && hasCrossedThreshold.value) {
+        hasCrossedThreshold.value = false;
+      }
     })
     .onEnd((e) => {
+      hasCrossedThreshold.value = false;
       const passed = Math.abs(translateX.value) > SWIPE_THRESHOLD || Math.abs(e.velocityX) > FLING_VELOCITY;
       if (passed && top) {
         const dir = translateX.value > 0 ? 1 : -1;
@@ -198,9 +215,17 @@ function FabButton({
   onPress: () => void;
 }) {
   const color = kind === 'like' ? SNAP_COLORS.like : SNAP_COLORS.nope;
+
+  const handlePress = () => {
+    if (Platform.OS !== 'web') {
+      void Haptics.impactAsync(kind === 'like' ? Haptics.ImpactFeedbackStyle.Medium : Haptics.ImpactFeedbackStyle.Light);
+    }
+    onPress();
+  };
+
   return (
     <Pressable
-      onPress={disabled ? undefined : onPress}
+      onPress={disabled ? undefined : handlePress}
       style={({ pressed }) => [
         styles.fab,
         { backgroundColor: color, opacity: disabled ? 0.4 : 1, transform: [{ scale: pressed ? 0.92 : 1 }] },

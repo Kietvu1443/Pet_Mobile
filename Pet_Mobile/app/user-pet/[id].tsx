@@ -23,6 +23,9 @@ import {
 import { resolveImageUrl } from '@/lib/images/resolveUrl';
 import { ConfirmDeleteModal } from '@/components/ConfirmDeleteModal';
 import { AppDialog, AppDialogProps } from '@/components/ui/AppDialog';
+import { PetQrModal } from '@/components/PetQrModal';
+import { fetchUserPetQrShare, type QrShareData } from '@/lib/api/publicPets';
+import * as Haptics from 'expo-haptics';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const IMAGE_HEIGHT = 300;
@@ -40,6 +43,22 @@ export default function UserPetDetailScreen() {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [dialogConfig, setDialogConfig] = useState<AppDialogProps | null>(null);
+  const [qrModalVisible, setQrModalVisible] = useState(false);
+  const [qrData, setQrData] = useState<QrShareData | null>(null);
+
+  const handleOpenQr = async () => {
+    if (!pet) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setQrModalVisible(true);
+    if (!qrData) {
+      try {
+        const data = await fetchUserPetQrShare(pet.id);
+        setQrData(data);
+      } catch (err) {
+        console.warn('Fetch user pet QR error:', err);
+      }
+    }
+  };
 
   const loadPetDetail = useCallback(async () => {
     if (!id || isNaN(Number(id))) {
@@ -179,6 +198,17 @@ export default function UserPetDetailScreen() {
             <Ionicons name="chevron-back" size={22} color={theme.colors.text} />
           </Pressable>
 
+          {/* Floating QR Code Button */}
+          <Pressable
+            style={[
+              styles.floatingNavBtn,
+              { backgroundColor: theme.isDark ? 'rgba(30,30,30,0.85)' : 'rgba(255,255,255,0.92)', top: insets.top + 12, right: 20 },
+            ]}
+            onPress={handleOpenQr}
+          >
+            <Ionicons name="qr-code-outline" size={20} color={theme.colors.text} />
+          </Pressable>
+
           {/* Gallery Pagination Badge */}
           {galleryImages.length > 1 && (
             <View style={[styles.photoCounterBadge, { bottom: 20, right: 20 }]}>
@@ -272,6 +302,27 @@ export default function UserPetDetailScreen() {
             </View>
           )}
 
+          {/* QR Share Banner */}
+          <Pressable
+            style={({ pressed }) => [
+              styles.qrShareBanner,
+              { backgroundColor: theme.colors.surface, borderColor: theme.colors.border },
+              pressed && { opacity: 0.88, transform: [{ scale: 0.99 }] },
+            ]}
+            onPress={handleOpenQr}
+          >
+            <View style={[styles.qrIconBadge, { backgroundColor: theme.colors.primaryContainer }]}>
+              <Ionicons name="qr-code" size={22} color={theme.colors.primary} />
+            </View>
+            <View style={{ flex: 1, marginLeft: 12 }}>
+              <Text style={[styles.qrBannerTitle, { color: theme.colors.text }]}>Mã QR hồ sơ bé</Text>
+              <Text style={[styles.qrBannerSubtitle, { color: theme.colors.muted }]}>
+                Tạo mã QR an toàn để người khác quét xem thông tin
+              </Text>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color={theme.colors.muted} />
+          </Pressable>
+
           {/* Delete Danger Action */}
           <View style={styles.dangerSection}>
             <Pressable
@@ -288,6 +339,17 @@ export default function UserPetDetailScreen() {
           </View>
         </View>
       </ScrollView>
+
+      {/* Pet QR Modal */}
+      <PetQrModal
+        visible={qrModalVisible}
+        onClose={() => setQrModalVisible(false)}
+        petName={pet.name}
+        token={qrData?.token}
+        canonicalUrl={qrData?.canonicalUrl}
+        petImageUrl={pet.image_url || (galleryImages.length > 0 ? galleryImages[0] : null)}
+        petTypeLabel="Thú cưng gia đình"
+      />
 
       {/* Confirmation Modal */}
       <ConfirmDeleteModal
@@ -513,5 +575,30 @@ const styles = StyleSheet.create({
   errorBtnText: {
     fontSize: 15,
     fontWeight: '700',
+  },
+  qrShareBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    borderRadius: 18,
+    borderWidth: 1,
+    marginTop: 18,
+    marginBottom: 8,
+  },
+  qrIconBadge: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  qrBannerTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    marginBottom: 2,
+  },
+  qrBannerSubtitle: {
+    fontSize: 12,
+    lineHeight: 16,
   },
 });

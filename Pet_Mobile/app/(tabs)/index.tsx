@@ -17,13 +17,13 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
-  Image,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
+import { Image } from 'expo-image';
 import Animated, {
   runOnJS,
   useAnimatedStyle,
@@ -32,6 +32,7 @@ import Animated, {
   withTiming,
   interpolate,
   Extrapolation,
+  Easing,
 } from 'react-native-reanimated';
 import { GestureDetector, Gesture } from 'react-native-gesture-handler';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -105,12 +106,126 @@ function formatDate(iso: string): string {
   }
 }
 
+// ---------------------------------------------------------------------------
+// SwipeCard & ExitingCard — tối ưu hóa mượt mà cho thao tác tốc độ cao
+// ---------------------------------------------------------------------------
+const SWIPE_THRESHOLD = 90;
+const SUPERLIKE_THRESHOLD = -90;
+const FLING_VELOCITY = 500;
 
-// ---------------------------------------------------------------------------
-// SwipeCard — faithful recreation of reference design in React Native
-// ---------------------------------------------------------------------------
-const SWIPE_THRESHOLD = 100;
-const SUPERLIKE_THRESHOLD = -100;
+type ExitingCardItem = {
+  pet: Pet;
+  direction: 'like' | 'dislike' | 'superlike';
+  initialX?: number;
+  initialY?: number;
+};
+
+function ExitingCard({
+  item,
+  onFinish,
+}: {
+  item: ExitingCardItem;
+  onFinish: () => void;
+}) {
+  const startX = item.initialX ?? 0;
+  const startY = item.initialY ?? 0;
+  const tx = useSharedValue(startX);
+  const ty = useSharedValue(startY);
+  const opacity = useSharedValue(1);
+
+  const verified = computeVerified(item.pet.code);
+  const traits = getMockTraits(item.pet.type, item.pet.breed);
+  const mainImage = item.pet.avatarUri ?? (item.pet.photos[0]?.uri ?? null);
+
+  useEffect(() => {
+    const targetX = item.direction === 'like' ? 600 : item.direction === 'dislike' ? -600 : startX;
+    const targetY = item.direction === 'superlike' ? -700 : startY;
+
+    tx.value = withTiming(targetX, { duration: 220, easing: Easing.out(Easing.quad) });
+    ty.value = withTiming(targetY, { duration: 220, easing: Easing.out(Easing.quad) });
+    opacity.value = withTiming(0, { duration: 220 }, (done) => {
+      if (done) {
+        runOnJS(onFinish)();
+      }
+    });
+  }, [item, onFinish, startX, startY, tx, ty, opacity]);
+
+  const cardStyle = useAnimatedStyle(() => {
+    const rotate = interpolate(tx.value, [-300, 0, 300], [-22, 0, 22], Extrapolation.CLAMP);
+    return {
+      transform: [
+        { translateX: tx.value },
+        { translateY: ty.value },
+        { rotate: `${rotate}deg` },
+      ],
+      opacity: opacity.value,
+      zIndex: 10,
+    };
+  });
+
+  return (
+    <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, cardStyle]}>
+      <View style={styles.cardInner}>
+        {mainImage ? (
+          <Image
+            source={{ uri: mainImage }}
+            style={StyleSheet.absoluteFill}
+            contentFit="cover"
+            cachePolicy="memory-disk"
+          />
+        ) : (
+          <View style={[StyleSheet.absoluteFill, { backgroundColor: '#F0F0F0' }]} />
+        )}
+        <View style={styles.cardGradient} />
+
+        {verified && (
+          <View style={styles.verifiedBadge}>
+            <Ionicons name="checkmark-circle" size={14} color="#FF4FA3" />
+            <Text style={styles.verifiedText}>Đã xác minh</Text>
+          </View>
+        )}
+
+        {item.direction === 'like' && (
+          <View style={[styles.likeStamp, { opacity: 1 }]}>
+            <Text style={styles.likeStampText}>THÍCH</Text>
+          </View>
+        )}
+
+        {item.direction === 'dislike' && (
+          <View style={[styles.nopeStamp, { opacity: 1 }]}>
+            <Text style={styles.nopeStampText}>BỎ QUA</Text>
+          </View>
+        )}
+
+        {item.direction === 'superlike' && (
+          <View style={[styles.superlikeStamp, { opacity: 1 }]}>
+            <Text style={styles.superlikeStampText}>SIÊU THÍCH</Text>
+          </View>
+        )}
+
+        <View style={styles.cardInfoOverlay}>
+          <View style={styles.cardNameRow}>
+            <Text style={styles.cardPetName}>{item.pet.name}</Text>
+            <Text style={styles.cardPetAge}>{item.pet.age ?? ''}</Text>
+          </View>
+          <View style={styles.cardMetaRow}>
+            <Text style={styles.cardBreed}>🐾 {item.pet.breed ?? item.pet.type ?? '--'}</Text>
+            <Text style={styles.cardDot}>·</Text>
+            <Ionicons name="location" size={12} color="rgba(255,255,255,0.75)" />
+            <Text style={styles.cardLocation}>TP. Hồ Chí Minh</Text>
+          </View>
+          <View style={styles.cardTraitsRow}>
+            {traits.slice(0, 3).map((t) => (
+              <View key={t} style={styles.traitChip}>
+                <Text style={styles.traitChipText}>{t}</Text>
+              </View>
+            ))}
+          </View>
+        </View>
+      </View>
+    </Animated.View>
+  );
+}
 
 function SwipeCard({
   pet,
@@ -121,17 +236,24 @@ function SwipeCard({
   isBehind = false,
 }: {
   pet: Pet;
-  onLike: () => void;
-  onDislike: () => void;
-  onSuperlike?: () => void;
+  onLike: (initX?: number, initY?: number) => void;
+  onDislike: (initX?: number, initY?: number) => void;
+  onSuperlike?: (initX?: number, initY?: number) => void;
   onDetail: () => void;
   isBehind?: boolean;
 }) {
   const tx = useSharedValue(0);
   const ty = useSharedValue(0);
+  const isDismissed = useSharedValue(false);
+  const entryScale = useSharedValue(isBehind ? 0.94 : 0.96);
+
+  useEffect(() => {
+    if (!isBehind) {
+      entryScale.value = withSpring(1, { stiffness: 450, damping: 32 });
+    }
+  }, [isBehind, entryScale]);
 
   const verified = computeVerified(pet.code);
-  // TODO: Replace with actual traits from backend when available
   const traits = getMockTraits(pet.type, pet.breed);
 
   const cardStyle = useAnimatedStyle(() => {
@@ -148,6 +270,7 @@ function SwipeCard({
       transform: [
         { translateX: tx.value },
         { translateY: ty.value },
+        { scale: entryScale.value },
         { rotate: `${rotate}deg` },
       ],
       zIndex: 2,
@@ -177,8 +300,10 @@ function SwipeCard({
   };
 
   const pan = Gesture.Pan()
+    .activeOffsetX([-10, 10])
+    .activeOffsetY([-10, 10])
     .onUpdate((e) => {
-      if (isBehind) return;
+      if (isBehind || isDismissed.value) return;
       tx.value = e.translationX;
       ty.value = e.translationY;
 
@@ -191,26 +316,38 @@ function SwipeCard({
       }
     })
     .onEnd((e) => {
-      if (isBehind) return;
+      if (isBehind || isDismissed.value) return;
       hasCrossedThreshold.value = false;
       const absX = Math.abs(e.translationX);
       const absY = Math.abs(e.translationY);
-      if (e.translationX > SWIPE_THRESHOLD && absX > absY) {
+      const isHorizontal = absX > absY;
+      const isFlingRight = isHorizontal && (e.velocityX > FLING_VELOCITY || e.translationX > SWIPE_THRESHOLD);
+      const isFlingLeft = isHorizontal && (e.velocityX < -FLING_VELOCITY || e.translationX < -SWIPE_THRESHOLD);
+      const isFlingUp = !isHorizontal && (e.velocityY < -FLING_VELOCITY || e.translationY < SUPERLIKE_THRESHOLD);
+
+      if (isFlingRight) {
+        isDismissed.value = true;
         runOnJS(triggerHaptic)(Haptics.ImpactFeedbackStyle.Medium);
-        tx.value = withTiming(600, { duration: 300 }, () => { runOnJS(onLike)(); });
-      } else if (e.translationX < -SWIPE_THRESHOLD && absX > absY) {
+        runOnJS(onLike)(e.translationX, e.translationY);
+      } else if (isFlingLeft) {
+        isDismissed.value = true;
         runOnJS(triggerHaptic)(Haptics.ImpactFeedbackStyle.Light);
-        tx.value = withTiming(-600, { duration: 300 }, () => { runOnJS(onDislike)(); });
-      } else if (e.translationY < SUPERLIKE_THRESHOLD && absY > absX) {
+        runOnJS(onDislike)(e.translationX, e.translationY);
+      } else if (isFlingUp) {
+        isDismissed.value = true;
         runOnJS(triggerHaptic)(Haptics.ImpactFeedbackStyle.Heavy);
-        ty.value = withTiming(-600, { duration: 300 }, () => {
-          if (onSuperlike) {
-            runOnJS(onSuperlike)();
-          } else {
-            runOnJS(onLike)();
-          }
-        });
+        if (onSuperlike) {
+          runOnJS(onSuperlike)(e.translationX, e.translationY);
+        } else {
+          runOnJS(onLike)(e.translationX, e.translationY);
+        }
       } else {
+        tx.value = withSpring(0, { stiffness: 400, damping: 30 });
+        ty.value = withSpring(0, { stiffness: 400, damping: 30 });
+      }
+    })
+    .onFinalize((_e, success) => {
+      if (!success && !isDismissed.value) {
         tx.value = withSpring(0, { stiffness: 400, damping: 30 });
         ty.value = withSpring(0, { stiffness: 400, damping: 30 });
       }
@@ -222,7 +359,12 @@ function SwipeCard({
     return (
       <Animated.View style={[StyleSheet.absoluteFill, cardStyle]}>
         {mainImage ? (
-          <Image source={{ uri: mainImage }} style={StyleSheet.absoluteFill} />
+          <Image
+            source={{ uri: mainImage }}
+            style={StyleSheet.absoluteFill}
+            contentFit="cover"
+            cachePolicy="memory-disk"
+          />
         ) : (
           <View style={[StyleSheet.absoluteFill, { backgroundColor: '#F5F5F5' }]} />
         )}
@@ -239,7 +381,12 @@ function SwipeCard({
           onPress={onDetail}
         >
           {mainImage ? (
-            <Image source={{ uri: mainImage }} style={StyleSheet.absoluteFill} />
+            <Image
+              source={{ uri: mainImage }}
+              style={StyleSheet.absoluteFill}
+              contentFit="cover"
+              cachePolicy="memory-disk"
+            />
           ) : (
             <View style={[StyleSheet.absoluteFill, { backgroundColor: '#F0F0F0' }]} />
           )}
@@ -278,7 +425,6 @@ function SwipeCard({
               <Text style={styles.cardBreed}>🐾 {pet.breed ?? pet.type ?? '--'}</Text>
               <Text style={styles.cardDot}>·</Text>
               <Ionicons name="location" size={12} color="rgba(255,255,255,0.75)" />
-              {/* TODO: Replace with actual location from pets.contact_info or pets.location */}
               <Text style={styles.cardLocation}>TP. Hồ Chí Minh</Text>
             </View>
             <View style={styles.cardTraitsRow}>
@@ -431,7 +577,12 @@ function ConnectedTab() {
               <View key={req.id} style={[styles.requestCard, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}>
                 <View style={styles.requestCardTop}>
                   {req.petImage ? (
-                    <Image source={{ uri: req.petImage }} style={styles.requestPetImage} />
+                    <Image
+                      source={{ uri: req.petImage }}
+                      style={styles.requestPetImage}
+                      contentFit="cover"
+                      cachePolicy="memory-disk"
+                    />
                   ) : (
                     <View style={[styles.requestPetImage, { backgroundColor: theme.colors.surface, alignItems: 'center', justifyContent: 'center' }]}>
                       <Ionicons name="paw" size={24} color={theme.colors.muted} />
@@ -475,32 +626,47 @@ function ConnectedTab() {
 // ---------------------------------------------------------------------------
 export default function AdoptScreen() {
   const { theme } = useTheme();
-  const { queue, status, errorMsg, acting, like, dislike, superlike, reload } = usePetQueue();
+  const { queue, status, errorMsg, like, dislike, superlike, reload } = usePetQueue();
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { t } = useTranslation(['tabs', 'common']);
   const { unread } = useUnreadNotifications();
 
   const [activeTab, setActiveTab] = useState<'explore' | 'connected'>('explore');
+  const [exitingCards, setExitingCards] = useState<ExitingCardItem[]>([]);
 
   const currentPet = queue[0] ?? null;
   const nextPet = queue[1] ?? null;
-  const ready = status === 'ready' && currentPet !== null;
+  const ready = currentPet !== null;
+
+  const handleSwipe = useCallback(
+    (pet: Pet, direction: 'like' | 'dislike' | 'superlike', initX = 0, initY = 0) => {
+      setExitingCards((prev) => [...prev, { pet, direction, initialX: initX, initialY: initY }]);
+      if (direction === 'like') {
+        void like(pet.id);
+      } else if (direction === 'dislike') {
+        void dislike(pet.id);
+      } else {
+        void superlike(pet.id);
+      }
+    },
+    [like, dislike, superlike],
+  );
 
   const handleLike = useCallback(() => {
-    if (!currentPet || acting) return;
-    void like(currentPet.id);
-  }, [currentPet, acting, like]);
+    if (!currentPet) return;
+    handleSwipe(currentPet, 'like');
+  }, [currentPet, handleSwipe]);
 
   const handleDislike = useCallback(() => {
-    if (!currentPet || acting) return;
-    void dislike(currentPet.id);
-  }, [currentPet, acting, dislike]);
+    if (!currentPet) return;
+    handleSwipe(currentPet, 'dislike');
+  }, [currentPet, handleSwipe]);
 
   const handleSuperlike = useCallback(() => {
-    if (!currentPet || acting) return;
-    void superlike(currentPet.id);
-  }, [currentPet, acting, superlike]);
+    if (!currentPet) return;
+    handleSwipe(currentPet, 'superlike');
+  }, [currentPet, handleSwipe]);
 
   const handleDetail = useCallback(() => {
     if (!currentPet) return;
@@ -555,7 +721,7 @@ export default function AdoptScreen() {
         <>
           {/* Card Area */}
           <View style={styles.cardArea}>
-            {status === 'loading' ? (
+            {status === 'loading' || (status === 'ready' && !currentPet) ? (
               <View style={[styles.stateBox, { backgroundColor: theme.colors.card }]}>
                 <ActivityIndicator size="large" color={theme.colors.primary} />
                 <Text style={[styles.stateMuted, { color: theme.colors.muted }]}>Đang tìm thú cưng phù hợp…</Text>
@@ -569,7 +735,7 @@ export default function AdoptScreen() {
                   <Text style={styles.stateBtnText}>Thử lại</Text>
                 </Pressable>
               </View>
-            ) : !ready ? (
+            ) : status === 'empty' ? (
               <View style={[styles.stateBox, { backgroundColor: theme.colors.card }]}>
                 <View style={[styles.stateEmoji, { backgroundColor: theme.colors.primaryContainer }]}><Text style={{ fontSize: 40 }}>🐾</Text></View>
                 <Text style={[styles.stateTitle, { color: theme.colors.text }]}>Đã hết rồi!</Text>
@@ -591,14 +757,23 @@ export default function AdoptScreen() {
                     isBehind
                   />
                 )}
-                <SwipeCard
-                  key={`top-${currentPet!.id}`}
-                  pet={currentPet!}
-                  onLike={handleLike}
-                  onDislike={handleDislike}
-                  onSuperlike={handleSuperlike}
-                  onDetail={handleDetail}
-                />
+                {currentPet && (
+                  <SwipeCard
+                    key={`top-${currentPet.id}`}
+                    pet={currentPet}
+                    onLike={(x, y) => handleSwipe(currentPet, 'like', x, y)}
+                    onDislike={(x, y) => handleSwipe(currentPet, 'dislike', x, y)}
+                    onSuperlike={(x, y) => handleSwipe(currentPet, 'superlike', x, y)}
+                    onDetail={handleDetail}
+                  />
+                )}
+                {exitingCards.map((item) => (
+                  <ExitingCard
+                    key={`exiting-${item.pet.id}`}
+                    item={item}
+                    onFinish={() => setExitingCards((prev) => prev.filter((c) => c.pet.id !== item.pet.id))}
+                  />
+                ))}
               </>
             )}
           </View>
@@ -606,21 +781,21 @@ export default function AdoptScreen() {
           {/* Action Buttons */}
           {ready && (
             <View style={[styles.actionBar, { paddingBottom: Math.max(8, insets.bottom) + 70 }]}>
-              <ActionBtn onPress={handleDislike} size={52} shadow="#000" disabled={acting}>
+              <ActionBtn onPress={handleDislike} size={52} shadow="#000" disabled={!ready}>
                 <Ionicons name="close" size={22} color="#FF4D4F" />
               </ActionBtn>
 
-              <ActionBtn onPress={handleSuperlike} size={62} shadow="#FFB800" disabled={acting}>
+              <ActionBtn onPress={handleSuperlike} size={62} shadow="#FFB800" disabled={!ready}>
                 <Ionicons name="star" size={26} color="#FFB800" />
               </ActionBtn>
 
               {/* Primary like button — larger, pink gradient */}
               <Pressable
                 onPress={handleLike}
-                disabled={acting}
+                disabled={!ready}
                 style={({ pressed }) => [
                   styles.likeBtn,
-                  { opacity: acting ? 0.5 : pressed ? 0.85 : 1 },
+                  { opacity: !ready ? 0.5 : pressed ? 0.85 : 1 },
                 ]}
               >
                 <Ionicons name="heart" size={34} color="white" />
@@ -630,7 +805,7 @@ export default function AdoptScreen() {
                 <Ionicons name="sparkles" size={24} color="#FFB340" />
               </ActionBtn>
 
-              <ActionBtn onPress={() => {}} size={52} shadow="#000">
+              <ActionBtn onPress={reload} size={52} shadow="#000">
                 <Ionicons name="refresh" size={20} color="#888" />
               </ActionBtn>
             </View>

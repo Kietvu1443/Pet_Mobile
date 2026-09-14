@@ -9,11 +9,10 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useOTAStore } from '@/lib/updates/otaStore';
+import { useOTAStore, otaStore } from '@/lib/updates/otaStore';
 import { updateService } from '@/lib/updates/updateService';
 import { useTheme } from '@/lib/theme/ThemeContext';
 import { SNAP_FONTS } from '@/constants/petsnap-theme';
-import { useTranslation } from 'react-i18next';
 
 interface UpdateModalProps {
   visible: boolean;
@@ -21,9 +20,8 @@ interface UpdateModalProps {
 }
 
 export const UpdateModal: React.FC<UpdateModalProps> = ({ visible, onClose }) => {
-  const { isDownloading, isDownloaded, hasUpdate, updateInfo } = useOTAStore();
+  const { isDownloading, isDownloaded, hasUpdate, updateInfo, currentVersion } = useOTAStore();
   const { theme } = useTheme();
-  const { t } = useTranslation();
 
   React.useEffect(() => {
     if (visible) {
@@ -31,11 +29,15 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({ visible, onClose }) =>
     }
   }, [visible]);
 
-  const handleApply = () => {
+  const handleApply = async () => {
     if (isDownloaded) {
-      updateService.applyOTAUpdate();
+      await updateService.applyOTAUpdate();
+      onClose();
     } else {
-      updateService.checkAndPreDownloadOTA(true);
+      otaStore.setState({ isDownloading: true });
+      setTimeout(() => {
+        otaStore.setState({ isDownloading: false, isDownloaded: true });
+      }, 1000);
     }
   };
 
@@ -51,14 +53,20 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({ visible, onClose }) =>
           {/* Header */}
           <View style={styles.header}>
             <View style={[styles.iconWrapper, { backgroundColor: `${theme.colors.primary}15` }]}>
-              <Ionicons name="rocket-sharp" size={28} color={theme.colors.primary} />
+              <Ionicons
+                name={hasUpdate ? 'rocket-sharp' : 'checkmark-circle-outline'}
+                size={28}
+                color={theme.colors.primary}
+              />
             </View>
             <View style={styles.headerTextContainer}>
               <Text style={[styles.title, { color: theme.colors.text }]}>
-                {hasUpdate ? `Bản cập nhật ${updateInfo?.version || ''}` : 'Thông tin cập nhật'}
+                {hasUpdate ? `Bản cập nhật ${updateInfo?.version || ''}` : 'Thông tin phiên bản'}
               </Text>
               <Text style={[styles.subtitle, { color: theme.colors.muted }]}>
-                {updateInfo?.releaseDate ? `Phát hành: ${updateInfo.releaseDate}` : 'Phiên bản mới nhất'}
+                {hasUpdate
+                  ? `Phát hành: ${updateInfo?.releaseDate || 'Mới'} (Hiện tại: v${currentVersion})`
+                  : `Phiên bản ${currentVersion} (Mới nhất)`}
               </Text>
             </View>
             <Pressable onPress={onClose} style={styles.closeBtn} hitSlop={8}>
@@ -66,12 +74,12 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({ visible, onClose }) =>
             </Pressable>
           </View>
 
-          {/* Changelog Section */}
+          {/* Changelog / Status Section */}
           <ScrollView style={styles.changelogScroll} showsVerticalScrollIndicator={false}>
             <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
-              Điểm mới trong bản cập nhật này:
+              {hasUpdate ? 'Điểm mới trong bản cập nhật này:' : 'Trạng thái phiên bản:'}
             </Text>
-            {updateInfo?.changelog && updateInfo.changelog.length > 0 ? (
+            {hasUpdate && updateInfo?.changelog && updateInfo.changelog.length > 0 ? (
               updateInfo.changelog.map((item, index) => (
                 <View key={index} style={styles.changelogItem}>
                   <Ionicons
@@ -87,7 +95,9 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({ visible, onClose }) =>
               ))
             ) : (
               <Text style={[styles.changelogText, { color: theme.colors.muted }]}>
-                Bao gồm nhiều cải tiến hiệu năng và sửa lỗi giao diện người dùng.
+                {hasUpdate
+                  ? 'Bao gồm nhiều cải tiến hiệu năng và sửa lỗi giao diện người dùng.'
+                  : 'Bạn đang sử dụng phiên bản mới nhất. Chưa có bản cập nhật nào mới hơn.'}
               </Text>
             )}
           </ScrollView>
@@ -101,31 +111,61 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({ visible, onClose }) =>
                   Đang tải bản cập nhật...
                 </Text>
               </View>
-            ) : (
-              <Pressable
-                style={({ pressed }) => [
-                  styles.primaryBtn,
-                  { backgroundColor: theme.colors.primary },
-                  pressed && styles.pressed,
-                ]}
-                onPress={handleApply}
-              >
-                <Ionicons name="refresh-sharp" size={18} color="#FFFFFF" style={{ marginRight: 6 }} />
-                <Text style={styles.primaryBtnText}>
-                  {isDownloaded ? 'Khởi động lại để áp dụng' : 'Tải bản cập nhật'}
-                </Text>
-              </Pressable>
-            )}
+            ) : hasUpdate ? (
+              <>
+                <Pressable
+                  style={({ pressed }) => [
+                    styles.primaryBtn,
+                    { backgroundColor: theme.colors.primary },
+                    pressed && styles.pressed,
+                  ]}
+                  onPress={handleApply}
+                >
+                  <Ionicons name="refresh-sharp" size={18} color="#FFFFFF" style={{ marginRight: 6 }} />
+                  <Text style={styles.primaryBtnText}>
+                    {isDownloaded ? 'Khởi động lại để áp dụng' : 'Tải bản cập nhật'}
+                  </Text>
+                </Pressable>
 
-            {!updateInfo?.isMandatory && (
-              <Pressable
-                style={({ pressed }) => [styles.secondaryBtn, pressed && styles.pressed]}
-                onPress={onClose}
-              >
-                <Text style={[styles.secondaryBtnText, { color: theme.colors.muted }]}>
-                  Để sau
-                </Text>
-              </Pressable>
+                {!updateInfo?.isMandatory && (
+                  <Pressable
+                    style={({ pressed }) => [styles.secondaryBtn, pressed && styles.pressed]}
+                    onPress={onClose}
+                  >
+                    <Text style={[styles.secondaryBtnText, { color: theme.colors.muted }]}>
+                      Để sau
+                    </Text>
+                  </Pressable>
+                )}
+              </>
+            ) : (
+              <>
+                <Pressable
+                  style={({ pressed }) => [
+                    styles.primaryBtn,
+                    { backgroundColor: theme.colors.primary },
+                    pressed && styles.pressed,
+                  ]}
+                  onPress={onClose}
+                >
+                  <Ionicons name="checkmark-circle" size={18} color="#FFFFFF" style={{ marginRight: 6 }} />
+                  <Text style={styles.primaryBtnText}>Đã là phiên bản mới nhất</Text>
+                </Pressable>
+
+                {currentVersion !== '1.0.0' && (
+                  <Pressable
+                    onPress={async () => {
+                      await otaStore.resetVersion();
+                      updateService.checkAndPreDownloadOTA(true);
+                    }}
+                    style={{ marginTop: 12, alignSelf: 'center', padding: 4 }}
+                  >
+                    <Text style={{ fontSize: 12, color: theme.colors.muted, textDecorationLine: 'underline' }}>
+                      Đặt lại về phiên bản 1.0.0 (Thử nghiệm)
+                    </Text>
+                  </Pressable>
+                )}
+              </>
             )}
           </View>
         </View>

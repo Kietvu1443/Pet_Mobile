@@ -127,7 +127,7 @@ export default function SettingsScreen() {
     await setThemeAccent(colorKey);
   };
 
-  const { hasUpdate, isDownloaded, isChecking } = useOTAStore();
+  const { hasUpdate, isDownloaded, isChecking, currentVersion } = useOTAStore();
   const [showUpdateModal, setShowUpdateModal] = useState(false);
   const [dialogConfig, setDialogConfig] = useState<AppDialogProps | null>(null);
 
@@ -344,7 +344,7 @@ export default function SettingsScreen() {
             ) : isChecking ? (
               <Text style={[styles.statusText, { color: theme.colors.muted }]}>Đang kiểm tra...</Text>
             ) : (
-              <Text style={[styles.statusText, { color: theme.colors.muted }]}>Phiên bản mới nhất</Text>
+              <Text style={[styles.statusText, { color: theme.colors.muted }]}>v{currentVersion}</Text>
             )}
             <Ionicons name="chevron-forward" size={18} color={theme.colors.muted} />
           </Pressable>

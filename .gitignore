@@ -57,3 +57,9 @@ Pet_Mobile/expo-env.d.ts
 .claude/
 AGENTS.md
 CLAUDE.md
+
+# Large build binaries
+*.apk
+*.aab
+**/release-builds/
+

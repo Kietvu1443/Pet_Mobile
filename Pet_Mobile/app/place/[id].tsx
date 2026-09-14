@@ -28,6 +28,7 @@ import { PlaceReviewModal } from '../../components/map/PlaceReviewModal';
 import { ReportModal } from '../../components/map/ReportModal';
 import { useAuth } from '../../lib/auth/AuthContext';
 import { AppDialog, AppDialogProps } from '../../components/ui/AppDialog';
+import { getCachedUserLocation, calculateDistanceMeters } from '../../lib/location/safeLocation';
 
 export default function PlaceDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -98,7 +99,22 @@ export default function PlaceDetailScreen() {
         fetchPlaceReviews(id, 1, 20).catch(() => ({ reviews: [], total: 0, totalPages: 0 })),
       ]);
 
-      setPlace(detailRes.place);
+      let placeData = detailRes.place;
+      const userGps = getCachedUserLocation();
+      if (userGps && placeData && placeData.latitude && placeData.longitude) {
+        const distMeters = calculateDistanceMeters(userGps, {
+          latitude: placeData.latitude,
+          longitude: placeData.longitude,
+        });
+        placeData = {
+          ...placeData,
+          distance_km: Number((distMeters / 1000).toFixed(2)),
+        };
+      } else if (placeData) {
+        placeData = { ...placeData, distance_km: null };
+      }
+
+      setPlace(placeData);
       setMyReview(detailRes.my_review);
       setReviews(reviewsRes.reviews || []);
       return detailRes;

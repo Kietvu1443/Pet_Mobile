@@ -643,8 +643,8 @@ export default function FavoritesScreen() {
       if (prev.includes(item.id)) {
         return prev.filter((id) => id !== item.id);
       }
-      if (prev.length >= 3) {
-        showToast("Chỉ có thể so sánh tối đa 3 thú cưng cùng lúc");
+      if (prev.length >= 4) {
+        showToast("Chỉ có thể so sánh tối đa 4 thú cưng cùng lúc");
         return prev;
       }
       return [...prev, item.id];
@@ -998,7 +998,7 @@ export default function FavoritesScreen() {
           <Text
             style={[styles.compareHintText, { color: theme.colors.primary }]}
           >
-            Đang chọn so sánh ({selectedForCompare.length}/3)
+            Đang chọn so sánh ({selectedForCompare.length}/4)
           </Text>
 
           {selectedForCompare.length >= 2 && (
@@ -1476,7 +1476,7 @@ export default function FavoritesScreen() {
               style={{ marginRight: 6 }}
             />
             <Text style={styles.compareFabText}>
-              ✓ Tiến hành so sánh ({selectedForCompare.length}/3)
+              ✓ Tiến hành so sánh ({selectedForCompare.length}/4)
             </Text>
           </Pressable>
         </View>

@@ -36,6 +36,7 @@ import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
 import { fetchMyReports } from '@/lib/api/reports';
 import { fetchMyBestMatches, type BestMatchSummary } from '@/lib/api/bestMatches';
+import { useOTAStore } from '@/lib/updates/otaStore';
 
 // Adoption request count from backend
 type AdoptionRequestsResponse = { requests: { status?: string }[]; total?: number };
@@ -72,6 +73,7 @@ export default function ProfileScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { t } = useTranslation(['profile', 'common', 'auth']);
+  const { currentVersion } = useOTAStore();
 
   const [adoptionCount, setAdoptionCount] = useState(0);
   const [bestMatches, setBestMatches] = useState<BestMatchSummary[]>([]);
@@ -389,7 +391,7 @@ export default function ProfileScreen() {
       </Pressable>
 
       {/* App version */}
-      <Text style={[styles.versionText, { color: theme.colors.muted }]}>Pet Match · Version 1.2.0</Text>
+      <Text style={[styles.versionText, { color: theme.colors.muted }]}>Pet Helper · Version {currentVersion}</Text>
     </ScrollView>
 
       {isLoggingOut && (

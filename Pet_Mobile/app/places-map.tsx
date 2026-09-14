@@ -66,6 +66,7 @@ export default function PlacesMapScreen() {
   const placesRef = useRef<Place[]>([]);
   const fetchSeqRef = useRef<number>(0);
   const queryLocationRef = useRef<SafeCoords | null>(null);
+  const userLocationRef = useRef<SafeCoords | null>(null);
 
   const [userLocation, setUserLocation] = useState<SafeCoords | null>(null);
   const [queryLocation, setQueryLocation] = useState<SafeCoords | null>(null);
@@ -89,6 +90,36 @@ export default function PlacesMapScreen() {
   useEffect(() => {
     queryLocationRef.current = queryLocation;
   }, [queryLocation]);
+
+  useEffect(() => {
+    userLocationRef.current = userLocation;
+    // Đồng bộ lại khoảng cách cho danh sách địa điểm hiện tại khi trạng thái GPS thay đổi
+    setPlaces((prevPlaces) =>
+      prevPlaces.map((p) => {
+        if (!userLocation) return { ...p, distance_km: null };
+        const distMeters = calculateDistanceMeters(userLocation, {
+          latitude: p.latitude,
+          longitude: p.longitude,
+        });
+        return {
+          ...p,
+          distance_km: Number((distMeters / 1000).toFixed(2)),
+        };
+      })
+    );
+    setSelectedPlace((prev) => {
+      if (!prev) return null;
+      if (!userLocation) return { ...prev, distance_km: null };
+      const distMeters = calculateDistanceMeters(userLocation, {
+        latitude: prev.latitude,
+        longitude: prev.longitude,
+      });
+      return {
+        ...prev,
+        distance_km: Number((distMeters / 1000).toFixed(2)),
+      };
+    });
+  }, [userLocation]);
 
   const loadPlaces = useCallback(
     async (typeFilter: 'all' | PlaceType, loc: SafeCoords | null, isSilent = false) => {
@@ -122,8 +153,23 @@ export default function PlacesMapScreen() {
         // Bỏ qua nếu có request mới hơn (ngăn race conditions)
         if (fetchSeqRef.current !== seq) return;
 
-        // Nếu không có GPS thực tế, loại bỏ distance_km để tránh tính sai khoảng cách từ trung tâm
-        const sanitized = loc ? res : res.map((p) => ({ ...p, distance_km: null }));
+        // CHỈ TÍNH KHOẢNG CÁCH KHI CÓ GPS THỰC TẾ CỦA USER:
+        // Nếu người dùng chưa bật định vị (userLocation == null), loại bỏ distance_km
+        // để tránh hiển thị khoảng cách tính từ tâm bản đồ mặc định.
+        const currentUserGps = userLocationRef.current;
+        const sanitized = res.map((p) => {
+          if (!currentUserGps) {
+            return { ...p, distance_km: null };
+          }
+          const distMeters = calculateDistanceMeters(currentUserGps, {
+            latitude: p.latitude,
+            longitude: p.longitude,
+          });
+          return {
+            ...p,
+            distance_km: Number((distMeters / 1000).toFixed(2)),
+          };
+        });
         setPlaces(sanitized);
 
         // Lưu vào TanStack Query cache
@@ -199,13 +245,10 @@ export default function PlacesMapScreen() {
 
           setUserLocation(freshLoc);
 
-          // Cập nhật queryLocation nếu người dùng chưa chuyển sang xem địa điểm mẫu (vẫn đang bám theo GPS)
+          // Cập nhật queryLocation nếu người dùng chưa chủ động tương tác với bản đồ
           setQueryLocation((prev) => {
             if (!prev) return freshLoc;
-            const isAtSampleCenter =
-              Math.abs(prev.latitude - DEFAULT_MAP_CENTER.latitude) < 0.001 &&
-              Math.abs(prev.longitude - DEFAULT_MAP_CENTER.longitude) < 0.001;
-            if (isAtSampleCenter) return prev;
+            if (!hasUserInteractedWithMap.current) return freshLoc;
 
             const hasSignificantMove = calculateDistanceMeters(prev, freshLoc) > 50;
             return hasSignificantMove ? freshLoc : prev;

@@ -1,5 +1,5 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Image,
@@ -30,18 +30,35 @@ export default function ComparePetsScreen() {
   const insets = useSafeAreaInsets();
   const { theme } = useTheme();
 
-  const { petIds: rawPetIds } = useLocalSearchParams<{ petIds?: string }>();
+  const { petIds: rawPetIds } = useLocalSearchParams<{ petIds?: string | string[] }>();
+
+  // Normalize rawPetIds to a canonical string (handles string, string[], or undefined)
+  const normalizedParamStr = useMemo(() => {
+    if (!rawPetIds) return '';
+    return Array.isArray(rawPetIds) ? rawPetIds.join(',') : String(rawPetIds).trim();
+  }, [rawPetIds]);
 
   // Parse IDs from params
-  const initialPetIds = useMemo(() => {
-    if (!rawPetIds) return [];
-    return rawPetIds
+  const parsedPetIds = useMemo(() => {
+    if (!normalizedParamStr) return [];
+    return normalizedParamStr
       .split(',')
       .map((id) => Number(id.trim()))
       .filter((id) => !isNaN(id) && id > 0);
-  }, [rawPetIds]);
+  }, [normalizedParamStr]);
 
-  const [activePetIds, setActivePetIds] = useState<number[]>(initialPetIds);
+  const [activePetIds, setActivePetIds] = useState<number[]>(parsedPetIds);
+
+  // Track the last synchronized navigation param to avoid overwriting local user actions (remove/add)
+  // and prevent navigation/state loop: params -> state -> user action -> state -> params -> effect -> state
+  const lastNavParamRef = useRef<string>(normalizedParamStr);
+
+  useEffect(() => {
+    if (normalizedParamStr && normalizedParamStr !== lastNavParamRef.current) {
+      lastNavParamRef.current = normalizedParamStr;
+      setActivePetIds(parsedPetIds);
+    }
+  }, [normalizedParamStr, parsedPetIds]);
 
   // Fetch pet detail for each ID
   const petQueries = useQueries({
@@ -130,7 +147,7 @@ export default function ComparePetsScreen() {
       age: pet?.age || 'Chưa rõ',
       gender: pet?.gender === 'male' || pet?.gender === 'đực' ? 'Đực ♂' : pet?.gender === 'female' || pet?.gender === 'cái' ? 'Cái ♀' : pet?.gender || '--',
       vaccination: pet?.vaccination ? 'Đã tiêm phòng 💉' : 'Chưa cập nhật ❓',
-      location: pet?.contact_info
+      location: typeof pet?.contact_info === 'string'
         ? pet.contact_info.replace(/\s*\([^)]*\)/g, '').replace(/https?:\/\/\S+/gi, '').trim()
         : 'Chưa rõ',
       collections: matchedColNames.length > 0 ? matchedColNames.join(', ') : 'Chưa xếp vào BST',
@@ -174,7 +191,7 @@ export default function ComparePetsScreen() {
         </Pressable>
         <View style={{ flex: 1, marginLeft: 12 }}>
           <Text style={[styles.headerTitle, { color: theme.colors.text }]}>
-            So sánh thú cưng ({activePetIds.length}/3)
+            So sánh thú cưng ({activePetIds.length}/4)
           </Text>
           <Text style={[styles.headerSubtitle, { color: theme.colors.muted }]}>
             Bảng đối chiếu thông tin chi tiết
